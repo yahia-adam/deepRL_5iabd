@@ -12,7 +12,7 @@ Projet d'implémentation d'algorithmes de Deep Reinforcement Learning et d'envir
 
 ### Assets & Résultats
 
-* **`game_assets/`** : Ressources visuelles des environnements (images des pièces, rendus graphiques)
+* **`game_assets/`** : Ressources visuelles des environnements (images, rendus graphiques)
 * **`experimentation/`** : Résultats des expérimentations (logs TensorBoard)
 
 ---
