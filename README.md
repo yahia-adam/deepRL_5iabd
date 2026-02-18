@@ -19,11 +19,11 @@ Projet d'implémentation d'algorithmes de Deep Reinforcement Learning et d'envir
 
 ## Commandes Utiles
 
-| Action                    | Commande                    |
-|---------------------------|-----------------------------|
-| **Installer les dépendances** | `uv sync`               |
-| **Lancer un script**      | `uv run python src/...`     |
-| **Activer l'environnement** | `source .venv/bin/activate` |
+| Action                    | Commande                         |
+|---------------------------|----------------------------------|
+| **Installer les dépendances** | `uv sync`                    |
+| **Lancer un script**      | `PYTHONPATH=. uv run src/...py`  |
+| **Activer l'environnement** | `source .venv/bin/activate`    |
 
 ---
 
