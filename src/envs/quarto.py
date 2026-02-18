@@ -1,5 +1,5 @@
-from envs.base_env import BaseEnv
 import pygame
+from src.config import settings
 
 class QuartoEnv():
     # COLOR_IDX = 0;   // light/dark
@@ -23,10 +23,9 @@ class QuartoEnv():
 
     def __init__(self):
         # super().__init__("quarto")
-        pygame.init()
-        self.scrn = pygame.display.set_mode((self.PG_WINDOW_HIGHT, self.PG_WINDOW_WIDTH))
-
-        self.pg_piece_assets = [pygame.image.load("/home/adam/Documents/esgi/drl/deepRL_5a/myPythonLib/game_assets/quarto_assets/0000.png") for _ in range(self.NUM_PIECES)]
+        # pygame.init()
+        # self.scrn = pygame.display.set_mode((self.PG_WINDOW_HIGHT, self.PG_WINDOW_WIDTH))
+        self.pg_piece_assets = [f"{settings.game_assets_path}/{i:04b}.png" for i in range(self.NUM_PIECES)]
 
         self.reset()
 
@@ -71,8 +70,8 @@ class QuartoEnv():
                     return True
         
         # egalité
-        if -1 not in self.available_pieces:
-            return True
+        # if -1 not in self.available_pieces:
+        #     return True
 
         return False
 
@@ -117,7 +116,7 @@ class QuartoEnv():
 
 def main():
     env = QuartoEnv()
-    env.render_pygame()
+    env._2v2_game()
     
 if __name__ == "__main__":
     main()
