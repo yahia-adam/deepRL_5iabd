@@ -4,8 +4,6 @@ class Settings(BaseSettings):
     # Configuration de Pydantic pour lire le fichier .env
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    game_assets_path: str
-    debug_mode: bool = False
 
 # Instanciation unique
 settings = Settings()
