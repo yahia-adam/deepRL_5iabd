@@ -1,5 +1,6 @@
 import pygame
-from src.config import settings
+from mypythonlib.config import settings
+from mypythonlib.envs.base_env import BaseEnv
 
 class Button:
     def __init__(self, x, y, width, height, image=None, color=(200, 200, 200)):
@@ -40,7 +41,7 @@ class QuartoEnv():
 
     PG_WINDOW_WIDTH = (PG_PIECE_WIDTH + PG_GAP) * (PIECE_ATTRIBUTES * 2) + PG_PIECE_WIDTH
     PG_WINDOW_HEIGHT = (PG_PIECE_HEIGHT + PG_GAP) * PIECE_ATTRIBUTES + PG_PIECE_HEIGHT
-    
+
     VICTORY_PATTERNS = [
         [0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], # Lignes horizontales
         [0, 4, 8, 12],   [1, 5, 9, 13],   [2, 6, 10, 14],  [3, 7, 11, 15], # Colonnes verticales
@@ -64,7 +65,7 @@ class QuartoEnv():
             row = i // self.PIECE_ATTRIBUTES
 
             asset = pygame.transform.scale(
-                pygame.image.load(f"{settings.game_assets_path}/{i:04b}.png"),
+                pygame.image.load(f"game_assets/quarto_assets/{i:04b}.png"),
                 (self.PG_PIECE_WIDTH, self.PG_PIECE_HEIGHT)
             )
 
