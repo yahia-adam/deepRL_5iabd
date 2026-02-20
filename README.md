@@ -22,6 +22,7 @@ Projet d'implémentation d'algorithmes de Deep Reinforcement Learning et d'envir
 | Action                    | Commande                    |
 |---------------------------|-----------------------------|
 | **Installer les dépendances** | `uv sync`               |
+| **Activer l'environement** | `source .venv/bin/activate`               |
 | **Lancer un script**      | `uv run python -m mypythonlib.envs.quarto`|
 
 ---
