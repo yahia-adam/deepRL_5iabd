@@ -134,8 +134,9 @@ class QuartoEnv(BaseEnv):
 
     def render(self):
         for event in pygame.event.get():
-            # if event.type == pygame.QUIT:
-                # loop = False
+            if event.type == pygame.QUIT:
+                pygame.quit()
+
             actions = [-1 for _ in range(self.NUM_PIECES*2)]
             if self.is_selecting_phase:
                 for i, piece in enumerate(self.pg_pieces):
@@ -192,9 +193,11 @@ class QuartoEnv(BaseEnv):
 
         return False
 
-    def _2v2_game(self):
-        while not self.is_game_over():
+    def _1v1_game(self):
+        running = True
+        while running:
             self.render()
+            running = not self.is_game_over()
             
     def _is_forbidden_action(self, actions):
         p_pose = np.argmax(actions)
@@ -216,10 +219,7 @@ class QuartoEnv(BaseEnv):
 
 def main():
     env = QuartoEnv()
-    running = True
-    while running:
-        env.render()
-        running = not env.is_game_over()
+    env._1v1_game()
 
 if __name__ == "__main__":
     main()
