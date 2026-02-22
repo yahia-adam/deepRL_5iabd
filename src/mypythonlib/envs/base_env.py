@@ -6,11 +6,19 @@ class BaseEnv(ABC):
         self.env = None
 
     @abstractmethod
+    def reset(self):
+        pass
+
+    @abstractmethod
     def step(self, data):
         pass
 
     @abstractmethod
-    def reset(self):
+    def is_game_over(self, data):
+        pass
+
+    @abstractmethod
+    def score(self):
         pass
 
     @abstractmethod
