@@ -4,7 +4,8 @@ class BaseEnv(ABC):
     def __init__(self, env_name):
         self.env_name = env_name
         self.env = None
-
+        self.current_player = 0
+    
     @abstractmethod
     def reset(self):
         pass
