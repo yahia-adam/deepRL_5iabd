@@ -32,7 +32,7 @@ class ReinforceModel(nn.Module):
         logits = self.output_layer(x)
         return softmax_with_mask(logits, mask)
 
-def reinforce(env: BaseEnv, nbr_episode: int = 10000, lr: float = 0.001, gamma: float = 0.99):
+def reinforce(env: BaseEnv, nbr_episode: int = 1_000_000_000, lr: float = 0.001, gamma: float = 0.99):
     reinforce_agent = ReinforceModel(input_size=len(env.get_observation_space()), output_size=len(env.get_action_space()))
     optimizer = torch.optim.Adam(reinforce_agent.parameters(), lr=lr)
     rp = RandomPlayer(len(env.get_action_space()))
@@ -94,5 +94,6 @@ def reinforce(env: BaseEnv, nbr_episode: int = 10000, lr: float = 0.001, gamma: 
         else:
             nbr_draw += 1
         
-        print(f"manch: {nbr_game} gagné: {nbr_win} egalité: {nbr_draw} perdu: {nbr_loss}")
+        if (nbr_game % 100 == 0):
+            print(f"%de gain {nbr_win / nbr_game} gagné: {nbr_win} perdu: {nbr_loss} egalité: {nbr_draw} manch: {nbr_game}")
     return reinforce_agent
