@@ -52,7 +52,7 @@ class QuartoEnv(BaseEnv):
     def __init__(self):
         super().__init__("quarto")
         self.reset()
-        self._init_pygame()
+        # self._init_pygame()
 
     def reset(self):
         self.all_pieces = [
@@ -67,11 +67,10 @@ class QuartoEnv(BaseEnv):
         self.is_selecting_phase = True
         self.selected_piece = [-1,-1,-1,-1]
 
-    def step(self, actions):
-        if self._is_forbidden_action(actions):
-            return
+    def step(self, p_pose):
+        # if self._is_forbidden_action(actions):
+        #     return
 
-        p_pose = np.argmax(actions)
         if self.is_selecting_phase:
             self.selected_piece = self._get_piece(p_pose, self.available_pieces)
             self._update_piece([-1,-1,-1,-1], p_pose, self.available_pieces)
@@ -102,7 +101,24 @@ class QuartoEnv(BaseEnv):
                 cel_3 = self.board[e[3] * self.PIECE_ATTRIBUTES + i]
                 if cel_0 == cel_1 and cel_1 == cel_2 and cel_2 == cel_3 and cel_3 != -1:
                     return True
+        if all(p != -1 for p in self.available_pieces):
+            return True
+        
+        return False
 
+    def is_game_over(self):
+        for e in self.VICTORY_PATTERNS:
+            for i in range(self.PIECE_ATTRIBUTES):
+                cel_0 = self.board[e[0] * self.PIECE_ATTRIBUTES + i]
+                cel_1 = self.board[e[1] * self.PIECE_ATTRIBUTES + i]
+                cel_2 = self.board[e[2] * self.PIECE_ATTRIBUTES + i]
+                cel_3 = self.board[e[3] * self.PIECE_ATTRIBUTES + i]
+                if cel_0 == cel_1 == cel_2 == cel_3 and cel_3 != -1:
+                    return True
+                    
+        if all(val == -1 for val in self.available_pieces):
+            return True
+        
         return False
 
     def score(self):
