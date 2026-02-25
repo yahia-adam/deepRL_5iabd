@@ -115,7 +115,7 @@ class QuartoEnv(BaseEnv):
                 cel_3 = self.board[e[3] * self.PIECE_ATTRIBUTES + i]
                 if cel_0 == cel_1 == cel_2 == cel_3 and cel_3 != -1:
                     return True
-                    
+
         if all(val == -1 for val in self.available_pieces):
             return True
         
@@ -129,6 +129,9 @@ class QuartoEnv(BaseEnv):
             return 1
         else:
             return -1
+
+    def monitor(self, loss, entropy, grad_norm, win_rate_100, ep_length, episodes_to_threshold, time_to_threshold, total_wall_time):
+        pass
 
     def render(self):
         for event in pygame.event.get():

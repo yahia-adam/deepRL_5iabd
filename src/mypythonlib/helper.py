@@ -1,6 +1,12 @@
 import torch
 import torch.nn.functional as F
 
+def get_default_device() -> str:
+    """Logique de détection automatique du matériel."""
+    if hasattr(torch, "accelerator") and torch.accelerator.is_available():
+        return torch.accelerator.current_accelerator().type
+    return "cpu"
+
 def softmax_with_mask(logits, mask):
     if not isinstance(mask, torch.Tensor):
         mask = torch.tensor(mask, device=logits.device).float()

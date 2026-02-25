@@ -31,7 +31,7 @@ class BaseEnv(ABC):
         pass
 
     @abstractmethod
-    def monitor(self, is_monitor, is_train, video_record_dir="", record_video_every=10):
+    def monitor(self, is_train, win_rate, episode_length, policy_loss):
         pass
 
     @abstractmethod
