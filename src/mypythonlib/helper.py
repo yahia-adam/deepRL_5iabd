@@ -30,15 +30,3 @@ def softmax_with_mask(logits, mask):
         probs = mask / (mask.sum(dim=-1, keepdim=True) + 1e-9)
 
     return probs
-
-class RandomPlayer():
-    def __init__(self, a_len):
-        self.a_len = a_len
-
-    def play(self, mask):
-        logits = torch.randn(self.a_len)
-        return softmax_with_mask(logits, mask)
-
-if __name__ == "__main__":
-    rp = RandomPlayer(a_len=5)
-    print(rp.play(mask=[0,1,1,0,0]))

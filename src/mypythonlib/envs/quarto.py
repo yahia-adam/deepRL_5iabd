@@ -2,7 +2,7 @@ import pygame
 import numpy as np
 from mypythonlib.config import settings
 from mypythonlib.envs.base_env import BaseEnv
-from mypythonlib.helper import RandomPlayer
+from mypythonlib.agents.random_agent import RandomPlayer
 from torch.distributions import Categorical
 
 class Button:
@@ -229,7 +229,7 @@ class QuartoEnv(BaseEnv):
         running = True
         while running:
             if self.current_player == 0:
-                rp_action = rp.play(mask=self.get_action_space())
+                rp_action = rp.forward(x=None, mask=self.get_action_space())
                 probs_dist = Categorical(rp_action)
                 action_pos = probs_dist.sample()
                 self.step(action_pos.item())

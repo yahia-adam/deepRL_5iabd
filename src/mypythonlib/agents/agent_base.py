@@ -1,0 +1,42 @@
+import torch.nn as nn
+import torch.nn.functional as F
+from mypythonlib.config import settings
+from mypythonlib.helper import softmax_with_mask
+
+class MyModel(nn.Module):
+    def __init__(self, input_size, output_size, hiddenlayers=[512, 256, 128]):
+        super().__init__()
+
+        self.layers = nn.ModuleList()
+        self.layers.append(nn.Linear(input_size, hiddenlayers[0]))
+        for i in range(1, len(hiddenlayers)):
+            self.layers.append(nn.Linear(hiddenlayers[i-1], hiddenlayers[i]))
+        self.output_layer = nn.Linear(hiddenlayers[-1], output_size)
+
+        self.config = {"input_size": input_size, "output_size": output_size, "layers": hiddenlayers}
+
+    def forward(self, x, mask):
+        for layer in self.layers:
+            x = F.relu(layer(x))
+
+        logits = self.output_layer(x)
+        return softmax_with_mask(logits, mask)
+
+    def save(self, filename="reinforce_model.pth"):
+        path = settings.models_path / filename
+        checkpoint = {
+            "state_dict": self.state_dict(),
+            "config": self.config
+        }
+        torch.save(checkpoint, path)
+
+    @classmethod
+    def load(cls, filename="reinforce_model.pth"):
+        path = settings.models_path / filename
+        checkpoint = torch.load(path, weights_only=False)
+        
+        model = cls(**checkpoint["config"])
+        model.load_state_dict(checkpoint["state_dict"])
+        model.eval()
+        return model
+
