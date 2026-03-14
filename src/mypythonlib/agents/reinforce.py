@@ -6,13 +6,12 @@ from torch.utils.tensorboard import SummaryWriter
 from mypythonlib.config import settings
 from mypythonlib.helper import softmax_with_mask
 from mypythonlib.envs.base_env import BaseEnv
-from mypythonlib.agents.agent_base import MyModel
-from mypythonlib.agents.random_agent import RandomPlayer
+from mypythonlib.agents.base_agent import BaseAgent
 
 def reinforce(env: BaseEnv,
-              oponent_model: MyModel,
-              reinforce_agent: MyModel,
-              nbr_episode: int = 100_000,
+              opponent_model: BaseAgent,
+              reinforce_agent: BaseAgent,
+              num_episodes: int = 100_000,
               lr: float = 0.001,
               gamma: float = 0.99,
               log_dir: str = settings.training_logs_path,
@@ -26,7 +25,7 @@ def reinforce(env: BaseEnv,
     # writer = SummaryWriter()
 
     nbr_win, nbr_loss, nbr_draw = 0, 0, 0
-    for epoch in range(1, nbr_episode):
+    for epoch in range(1, num_episodes):
         env.reset()
         states, actions, rewards = [], [], []
         log_probs = []
@@ -49,7 +48,7 @@ def reinforce(env: BaseEnv,
                 rewards.append(env.score())
             else:
                 mask = env.get_action_space()
-                probs = oponent_model.forward(x=None, mask=mask)
+                probs = opponent_model.forward(x=None, mask=mask)
                 probs_dist = Categorical(probs)
                 action_pos = probs_dist.sample()
                 env.step(action_pos.item())
@@ -83,7 +82,6 @@ def reinforce(env: BaseEnv,
             # writer.add_scalar(
             #     f"{log_dir}/{model_name}", 
             #     {"pourcentage de gain": (nbr_win / epoch)})
-        epoch += 1
     
     # writer.flush()
     return reinforce_agent

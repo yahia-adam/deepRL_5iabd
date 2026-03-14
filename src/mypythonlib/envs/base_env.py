@@ -8,32 +8,32 @@ class BaseEnv(ABC):
     
     @abstractmethod
     def reset(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
-    def step(self, data):
-        pass
+    def step(self, action: int) -> None:
+        raise NotImplementedError
 
     @abstractmethod
-    def is_game_over(self, data):
-        pass
+    def is_game_over(self) -> bool:
+        raise NotImplementedError
 
     @abstractmethod
     def score(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_action_space(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_observation_space(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def monitor(self, is_train, win_rate, episode_length, policy_loss):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def render(self):
-        pass
+        raise NotImplementedError

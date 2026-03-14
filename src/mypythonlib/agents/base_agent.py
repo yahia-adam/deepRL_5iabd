@@ -1,12 +1,30 @@
+
 import torch.nn as nn
 import torch.nn.functional as F
+from abc import ABC, abstractmethod
 from mypythonlib.config import settings
 from mypythonlib.helper import softmax_with_mask
 
-class MyModel(nn.Module):
-    def __init__(self, input_size, output_size, hiddenlayers=[512, 256, 128]):
+class BaseAgent(ABC):
+    @abstractmethod
+    def forward(self, x, mask):
+        raise NotImplementedError
+
+    @abstractmethod
+    def save(self, filename):
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def load(cls, filename):
+        raise NotImplementedError
+
+class MyModel(nn.Module, BaseAgent):
+    def __init__(self, input_size, output_size, hiddenlayers=None):
         super().__init__()
 
+        if not hiddenlayers:
+            hiddenlayers = [512, 256, 128]
         self.layers = nn.ModuleList()
         self.layers.append(nn.Linear(input_size, hiddenlayers[0]))
         for i in range(1, len(hiddenlayers)):
@@ -22,7 +40,9 @@ class MyModel(nn.Module):
         logits = self.output_layer(x)
         return softmax_with_mask(logits, mask)
 
-    def save(self, filename="reinforce_model.pth"):
+    def save(self, filename=None):
+        if filename is None:
+            filename = f"{__class__.__name__}.pth"
         path = settings.models_path / filename
         checkpoint = {
             "state_dict": self.state_dict(),
@@ -31,7 +51,9 @@ class MyModel(nn.Module):
         torch.save(checkpoint, path)
 
     @classmethod
-    def load(cls, filename="reinforce_model.pth"):
+    def load(cls, filename=None):
+        if filename is None:
+            filename = f"{__class__.__name__}.pth"
         path = settings.models_path / filename
         checkpoint = torch.load(path, weights_only=False)
         
@@ -39,4 +61,3 @@ class MyModel(nn.Module):
         model.load_state_dict(checkpoint["state_dict"])
         model.eval()
         return model
-

@@ -3,7 +3,6 @@ import numpy as np
 from mypythonlib.config import settings
 from mypythonlib.envs.base_env import BaseEnv
 from mypythonlib.agents.random_agent import RandomPlayer
-from torch.distributions import Categorical
 
 class Button:
     def __init__(self, x, y, width, height, image=None, color=(200, 200, 200)):
@@ -53,7 +52,7 @@ class QuartoEnv(BaseEnv):
     def __init__(self):
         super().__init__("quarto")
         self.reset()
-        self._init_pygame()
+        self._pygame_initialized = False
 
     def reset(self):
         self.all_pieces = [
@@ -68,18 +67,18 @@ class QuartoEnv(BaseEnv):
         self.is_selecting_phase = True
         self.selected_piece = [-1,-1,-1,-1]
 
-    def step(self, p_pose):
+    def step(self, action):
         # if self._is_forbidden_action(actions):
         #     return
 
-        # p_pose = np.argmax(p_pose)
+        # action = np.argmax(action)
         if self.is_selecting_phase:
-            self.selected_piece = self._get_piece(p_pose, self.available_pieces)
-            self._update_piece([-1,-1,-1,-1], p_pose, self.available_pieces)
+            self.selected_piece = self._get_piece(action, self.available_pieces)
+            self._update_piece([-1,-1,-1,-1], action, self.available_pieces)
             self.current_player = not self.current_player
         else:
-            p_pose -= self.NUM_PIECES
-            self._update_piece(self.selected_piece, p_pose, self.board)
+            action -= self.NUM_PIECES
+            self._update_piece(self.selected_piece, action, self.board)
             self.selected_piece = [-1,-1,-1,-1]
 
         self.is_selecting_phase = not self.is_selecting_phase
@@ -95,20 +94,6 @@ class QuartoEnv(BaseEnv):
     
     def get_observation_space(self):
         return self.selected_piece + self.board + self.available_pieces
-
-    def is_game_over(self):
-        for e in self.VICTORY_PATTERNS:
-            for i in range(self.PIECE_ATTRIBUTES):
-                cel_0 = self.board[e[0] * self.PIECE_ATTRIBUTES + i]
-                cel_1 = self.board[e[1] * self.PIECE_ATTRIBUTES + i]
-                cel_2 = self.board[e[2] * self.PIECE_ATTRIBUTES + i]
-                cel_3 = self.board[e[3] * self.PIECE_ATTRIBUTES + i]
-                if cel_0 == cel_1 and cel_1 == cel_2 and cel_2 == cel_3 and cel_3 != -1:
-                    return True
-        if all(p != -1 for p in self.available_pieces):
-            return True
-        
-        return False
 
     def is_game_over(self):
         for e in self.VICTORY_PATTERNS:
@@ -138,6 +123,10 @@ class QuartoEnv(BaseEnv):
         pass
 
     def render(self):
+        if not self._pygame_initialized:
+            self._init_pygame()
+            self._pygame_initialized = True
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -225,14 +214,13 @@ class QuartoEnv(BaseEnv):
         pass
 
     def _1_vs_randomplayer(self):
-        rp = RandomPlayer(a_len=self.NUM_PIECES * 2)
+        rp = RandomPlayer(action_dim=self.NUM_PIECES * 2)
         running = True
         while running:
             if self.current_player == 0:
-                rp_action = rp.forward(x=None, mask=self.get_action_space())
-                probs_dist = Categorical(rp_action)
-                action_pos = probs_dist.sample()
-                self.step(action_pos.item())
+                action_dist = rp.forward(x=None, mask=self.get_action_space())
+                action = np.argmax(action_dist)
+                self.step(action)
             self.render()
             running = not self.is_game_over()
 
@@ -245,14 +233,14 @@ class QuartoEnv(BaseEnv):
                 print("Vous avez gagné")
 
     def _is_forbidden_action(self, actions):
-        p_pose = np.argmax(actions)
+        action = np.argmax(actions)
         if self.is_selecting_phase:
-            p = self._get_piece(p_pose, self.available_pieces)
+            p = self._get_piece(action, self.available_pieces)
             if -1 in p:
                 return True
         else :
-            p_pose -= self.NUM_PIECES
-            p = self._get_piece(p_pose, self.board) 
+            action -= self.NUM_PIECES
+            p = self._get_piece(action, self.board) 
             if 0 in p or 1 in p:
                 return True
 
