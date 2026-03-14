@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 
 class BaseEnv(ABC):
     def __init__(self, env_name):
-        self.env_name = env_name
         self.env = None
+        self.env_name = env_name
         self.current_player = 0
     
     @abstractmethod
-    def reset(self):
+    def reset(self) -> None:
         raise NotImplementedError
 
     @abstractmethod
@@ -19,21 +19,13 @@ class BaseEnv(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def score(self):
+    def score(self) -> int:
         raise NotImplementedError
 
     @abstractmethod
-    def get_action_space(self):
+    def get_action_space(self) -> list[int]:
         raise NotImplementedError
 
     @abstractmethod
-    def get_observation_space(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    def monitor(self, is_train, win_rate, episode_length, policy_loss):
-        raise NotImplementedError
-
-    @abstractmethod
-    def render(self):
+    def get_observation_space(self) -> list[int]:
         raise NotImplementedError

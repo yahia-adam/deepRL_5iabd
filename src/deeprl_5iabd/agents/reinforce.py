@@ -2,12 +2,11 @@ import torch
 from torch import optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from torch.utils.tensorboard import SummaryWriter
-from mypythonlib.config import settings
-from mypythonlib.helper import softmax_with_mask
-from mypythonlib.envs.base_env import BaseEnv
-from mypythonlib.agents.base_agent import BaseAgent
-from mypythonlib.tracking.base_logger import BaseLogger
+from deeprl_5iabd.config import settings
+from deeprl_5iabd.helper import softmax_with_mask
+from deeprl_5iabd.envs.base_env import BaseEnv
+from deeprl_5iabd.agents.base_agent import BaseAgent
+from deeprl_5iabd.tracking.base_logger import BaseLogger
 
 def reinforce(env: BaseEnv,
               opponent_model: BaseAgent,

@@ -1,5 +1,5 @@
 from torch.utils.tensorboard import SummaryWriter
-from mypythonlib.tracking.base_logger import BaseLogger
+from deeprl_5iabd.tracking.base_logger import BaseLogger
 
 class TensorBoardLogger(BaseLogger):
     def __init__(self, log_dir: str, experiment_name: str):

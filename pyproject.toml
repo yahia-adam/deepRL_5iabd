@@ -1,5 +1,5 @@
 [project]
-name = "mypythonlib"
+name = "deeprl_5iabd"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -9,7 +9,6 @@ dependencies = [
     "numpy>=2.4.2",
     "pydantic-settings>=2.13.1",
     "pygame>=2.6.1",
-    "setuptools==41.0.0",
     "tensorboard>=2.20.0",
     "torch>=2.10.0",
 ]
@@ -19,11 +18,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mypythonlib"]
-
-dependencies = [
-    "numpy>=2.4.2",
-    "pydantic>=2.12.5",
-    "pydantic-settings>=2.13.0",
-    "pygame>=2.6.1",
-]
+packages = ["src/deeprl_5iabd"]

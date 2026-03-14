@@ -1,6 +1,6 @@
 import torch
-from mypythonlib.agents.base_agent import BaseAgent
-from mypythonlib.helper import softmax_with_mask
+from deeprl_5iabd.agents.base_agent import BaseAgent
+from deeprl_5iabd.helper import softmax_with_mask
 
 class RandomPlayer(BaseAgent):
     def __init__(self, action_dim):
