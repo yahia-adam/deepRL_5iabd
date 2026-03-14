@@ -3,8 +3,8 @@ mes_notes.md
 __pycache__/
 *.py[codz]
 *$py.class
-experimentation/models/
-experimentation/train_logs/
+experimentation_logs/models/
+experimentation_logs/train_logs/
 
 # C extensions
 *.so
