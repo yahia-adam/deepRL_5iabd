@@ -7,10 +7,12 @@ from mypythonlib.config import settings
 from mypythonlib.helper import softmax_with_mask
 from mypythonlib.envs.base_env import BaseEnv
 from mypythonlib.agents.base_agent import BaseAgent
+from mypythonlib.tracking.base_logger import BaseLogger
 
 def reinforce(env: BaseEnv,
               opponent_model: BaseAgent,
               reinforce_agent: BaseAgent,
+              logger: BaseLogger | None = None,
               num_episodes: int = 100_000,
               lr: float = 0.001,
               gamma: float = 0.99,
@@ -77,11 +79,18 @@ def reinforce(env: BaseEnv,
         else:
             nbr_draw += 1
 
-        if (epoch % 100 == 0):
-            print(f"%de gain {nbr_win / epoch} gagné: {nbr_win} perdu: {nbr_loss} egalité: {nbr_draw} manch: {epoch}")
-            # writer.add_scalar(
-            #     f"{log_dir}/{model_name}", 
-            #     {"pourcentage de gain": (nbr_win / epoch)})
-    
-    # writer.flush()
+        if logger is not None:
+            metrics = {
+                "Train/Loss": loss.item(),
+                "Train/WinRate": nbr_win / epoch,
+                "Train/EpisodeLength": len(states)
+            }
+            logger.log_dict(metrics, step=epoch)
+            
+        if epoch % 100 == 0:
+            print(f"Manche {epoch} | Gain {nbr_win/epoch:.2f} | Loss {loss.item():.4f}")
+
+    if logger is not None:
+        logger.close()
+
     return reinforce_agent
