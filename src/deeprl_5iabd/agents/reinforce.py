@@ -32,7 +32,7 @@ def reinforce(env: BaseEnv,
         log_probs = []
 
         while not env.is_game_over():
-            if env.current_player == 0:
+            if env.player == 0:
                 mask = env.get_action_space()
                 np_state = env.get_observation_space()
 

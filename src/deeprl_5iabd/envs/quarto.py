@@ -92,6 +92,8 @@ class QuartoEnv(BaseEnv):
         return bool(np.all(self.available[:, :, 0] == -1))
 
     def score(self) -> int:
+        if not self.is_game_over():
+            return 0
         if np.all(self.available[:, :, 0] == -1):
             return 0
         return 1 if self.player == 0 else -1

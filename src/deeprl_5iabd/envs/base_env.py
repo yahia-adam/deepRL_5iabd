@@ -2,9 +2,8 @@ from abc import ABC, abstractmethod
 
 class BaseEnv(ABC):
     def __init__(self, env_name):
-        self.env = None
         self.env_name = env_name
-        self.current_player = 0
+        self.player = 0
     
     @abstractmethod
     def reset(self) -> None:
