@@ -1,7 +1,7 @@
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.envs.quarto import QuartoEnv
 from deeprl_5iabd.agents.reinforce import reinforce
-from deeprl_5iabd.agents.my_model import PolicyNetwork
+from deeprl_5iabd.agents.policy_net import PolicyNetwork
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 from deeprl_5iabd.tracking.tb_logger import TensorBoardLogger
 
