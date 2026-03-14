@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 
 def get_default_device() -> str:
-    """Logique de détection automatique du matériel."""
     if hasattr(torch, "accelerator") and torch.accelerator.is_available():
         return torch.accelerator.current_accelerator().type
     return "cpu"
@@ -29,7 +28,7 @@ def softmax_with_mask(logits, mask):
     if torch.isnan(probs).any() or probs.sum() <= 0:
         # On met 1 là où c'est autorisé, 0 ailleurs
         probs = mask / (mask.sum(dim=-1, keepdim=True) + 1e-9)
-        
+
     return probs
 
 class RandomPlayer():
@@ -39,7 +38,7 @@ class RandomPlayer():
     def play(self, mask):
         logits = torch.randn(self.a_len)
         return softmax_with_mask(logits, mask)
-    
+
 if __name__ == "__main__":
-    rp = RandomPlayer(5)
-    print(rp.play([0,1,1,0,0]))
+    rp = RandomPlayer(a_len=5)
+    print(rp.play(mask=[0,1,1,0,0]))

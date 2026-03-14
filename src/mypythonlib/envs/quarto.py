@@ -3,6 +3,7 @@ import numpy as np
 from mypythonlib.config import settings
 from mypythonlib.envs.base_env import BaseEnv
 from mypythonlib.helper import RandomPlayer
+from torch.distributions import Categorical
 
 class Button:
     def __init__(self, x, y, width, height, image=None, color=(200, 200, 200)):
@@ -52,7 +53,7 @@ class QuartoEnv(BaseEnv):
     def __init__(self):
         super().__init__("quarto")
         self.reset()
-        # self._init_pygame()
+        self._init_pygame()
 
     def reset(self):
         self.all_pieces = [
@@ -71,6 +72,7 @@ class QuartoEnv(BaseEnv):
         # if self._is_forbidden_action(actions):
         #     return
 
+        # p_pose = np.argmax(p_pose)
         if self.is_selecting_phase:
             self.selected_piece = self._get_piece(p_pose, self.available_pieces)
             self._update_piece([-1,-1,-1,-1], p_pose, self.available_pieces)
@@ -84,6 +86,8 @@ class QuartoEnv(BaseEnv):
 
     def get_action_space(self):
         placement_mask = [0 ]* self.NUM_PIECES
+
+        
         if (self.is_selecting_phase):
             return [1 if self.available_pieces[i] != -1 else 0 for i in range(0, self.NUM_PIECES * self.PIECE_ATTRIBUTES, self.PIECE_ATTRIBUTES)] + placement_mask
         else :
@@ -138,17 +142,14 @@ class QuartoEnv(BaseEnv):
             if event.type == pygame.QUIT:
                 pygame.quit()
 
-            actions = [-1 for _ in range(self.NUM_PIECES*2)]
             if self.is_selecting_phase:
                 for i, piece in enumerate(self.pg_pieces):
                     if piece.is_clicked(event):
-                        actions[i] = 1
-                        self.step(actions)
+                        self.step(i)
             else :
                 for i, cell in enumerate(self.pg_board):
                     if cell.is_clicked(event) and self.pg_selected.image is not None:
-                        actions[i+self.NUM_PIECES] = 1
-                        self.step(actions)
+                        self.step(i+self.NUM_PIECES)
             self.scrn.fill((0, 0, 0))
 
             # player
@@ -224,14 +225,14 @@ class QuartoEnv(BaseEnv):
         pass
 
     def _1_vs_randomplayer(self):
-        rp = RandomPlayer(self.NUM_PIECES * 2)
+        rp = RandomPlayer(a_len=self.NUM_PIECES * 2)
         running = True
         while running:
             if self.current_player == 0:
-                rp_action = rp.play(self.get_action_space())
-                # print(len(rp_action),rp_action)
-                self.step(rp_action)
-
+                rp_action = rp.play(mask=self.get_action_space())
+                probs_dist = Categorical(rp_action)
+                action_pos = probs_dist.sample()
+                self.step(action_pos.item())
             self.render()
             running = not self.is_game_over()
 

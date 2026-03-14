@@ -12,20 +12,21 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 class ReinforceModel(nn.Module):
-    def __init__(self, input_size, output_size, layers=[512, 256, 128]):
+    def __init__(self, input_size, output_size, hiddenlayers=[512, 256, 128]):
         super().__init__()
-        self.layers = nn.ModuleList()
-        self.layers.append(nn.Linear(input_size, layers[0]))
-        for i in range(1, len(layers)):
-            self.layers.append(nn.Linear(layers[i-1], layers[i]))
-        self.output_layer = nn.Linear(layers[-1], output_size)
 
-        self.config = {"input_size": input_size, "output_size": output_size, "layers": layers}
+        self.layers = nn.ModuleList()
+        self.layers.append(nn.Linear(input_size, hiddenlayers[0]))
+        for i in range(1, len(hiddenlayers)):
+            self.layers.append(nn.Linear(hiddenlayers[i-1], hiddenlayers[i]))
+        self.output_layer = nn.Linear(hiddenlayers[-1], output_size)
+
+        self.config = {"input_size": input_size, "output_size": output_size, "layers": hiddenlayers}
 
     def forward(self, x, mask):
         for layer in self.layers:
             x = F.relu(layer(x))
-        
+
         logits = self.output_layer(x)
         return softmax_with_mask(logits, mask)
 
@@ -86,13 +87,13 @@ def reinforce(env: BaseEnv,
                 log_probs.append(probs_dist.log_prob(action_pos))
 
                 env.step(action_pos.item())
-                rewards.append(env.score()) 
+                rewards.append(env.score())
             else:
                 mask = env.get_action_space()
                 probs = oponent_model.play(mask)
                 probs_dist = Categorical(probs)
                 action_pos = probs_dist.sample()
-                env.step(action_pos)
+                env.step(action_pos.item())
 
         loss = 0
         for t in range(len(states)):
@@ -123,6 +124,7 @@ def reinforce(env: BaseEnv,
             # writer.add_scalar(
             #     f"{log_dir}/{model_name}", 
             #     {"pourcentage de gain": (nbr_win / epoch)})
-
+        epoch += 1
+    
     # writer.flush()
     return reinforce_agent
