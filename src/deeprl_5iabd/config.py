@@ -10,7 +10,6 @@ class Settings(BaseSettings):
 
     debug_mode: bool = False
     device: str = Field(default_factory=get_default_device)
-    seeds: ClassVar[list[int]] = [13, 17, 42, 55, 88]
 
     models_dir: str = "experimentation_logs/models"
     training_logs_dir: str = "experimentation_logs/train_logs"
