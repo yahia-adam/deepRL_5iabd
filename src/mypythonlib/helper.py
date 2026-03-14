@@ -9,7 +9,7 @@ def get_default_device() -> str:
 def softmax_with_mask(logits, mask):
     if not isinstance(mask, torch.Tensor):
         mask = torch.tensor(mask, device=logits.device).float()
-    
+
     # S'assurer que mask et logits ont la même forme [batch, 32]
     mask = mask.view(logits.shape)
 

@@ -5,6 +5,7 @@ __pycache__/
 *$py.class
 experimentation/models/
 experimentation/train_logs/
+
 # C extensions
 *.so
 .env

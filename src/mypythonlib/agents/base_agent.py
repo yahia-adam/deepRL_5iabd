@@ -1,4 +1,4 @@
-
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from abc import ABC, abstractmethod
@@ -31,7 +31,7 @@ class MyModel(nn.Module, BaseAgent):
             self.layers.append(nn.Linear(hiddenlayers[i-1], hiddenlayers[i]))
         self.output_layer = nn.Linear(hiddenlayers[-1], output_size)
 
-        self.config = {"input_size": input_size, "output_size": output_size, "layers": hiddenlayers}
+        self.config = {"input_size": input_size, "output_size": output_size, "hiddenlayers": hiddenlayers}
 
     def forward(self, x, mask):
         for layer in self.layers:
@@ -56,8 +56,16 @@ class MyModel(nn.Module, BaseAgent):
             filename = f"{__class__.__name__}.pth"
         path = settings.models_path / filename
         checkpoint = torch.load(path, weights_only=False)
-        
+
         model = cls(**checkpoint["config"])
         model.load_state_dict(checkpoint["state_dict"])
         model.eval()
         return model
+
+if __name__ == "__main__":
+    model = MyModel(input_size=16, output_size=32)
+    filename = "test.pth"
+    model.save(filename)
+    print(f"model.config: {model.config}")
+    model2 = MyModel.load(filename)
+    print(f"model2.config: {model2.config}")
