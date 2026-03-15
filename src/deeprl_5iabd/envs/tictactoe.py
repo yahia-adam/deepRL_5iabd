@@ -2,7 +2,7 @@ import pygame
 import numpy as np
 from deeprl_5iabd.envs.base_env import BaseEnv
 from deeprl_5iabd.config import settings
-from deeprl_5iabd.envs.quarto import QuartoButton
+from deeprl_5iabd.helper import ImageButton
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 
 class TicTacToe(BaseEnv):
@@ -121,7 +121,7 @@ class TicTacToe(BaseEnv):
 
         self.pg_board = [
             [
-                QuartoButton(
+                ImageButton(
                     c * (self.PG_PIECE_W + self.PG_GAP),
                     r * (self.PG_PIECE_H + self.PG_GAP) + self.TEXT_H,
                     self.PG_PIECE_W,

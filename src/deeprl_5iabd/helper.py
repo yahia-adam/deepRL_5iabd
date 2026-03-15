@@ -1,6 +1,21 @@
 import torch
+import pygame
 import torch.nn.functional as F
 import numpy as np
+
+class ImageButton:
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.image = None
+
+    def draw(self, screen):
+        if self.image:
+            screen.blit(self.image, self.rect)
+        else:
+            pygame.draw.rect(screen, (200, 200, 200), self.rect)
+
+    def is_clicked(self, event):
+        return event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos)
 
 def get_default_device() -> str:
     if hasattr(torch, "accelerator") and torch.accelerator.is_available():

@@ -1,5 +1,7 @@
-from deeprl_5iabd.envs.base_env import BaseEnv
 import pygame
+from deeprl_5iabd.config import settings
+from deeprl_5iabd.helper import ImageButton
+from deeprl_5iabd.envs.base_env import BaseEnv
 
 class LineWorld(BaseEnv):
     """Environnement 1D : ligne de 5 positions (0-4).
@@ -8,6 +10,15 @@ class LineWorld(BaseEnv):
     - Positions 1-3 : récompense 0
     - Actions : 0=gauche, 1=droite
     """
+
+    BOARD_SIZE = 5
+
+    PG_PIECE_W = 250
+    PG_PIECE_H = 250
+    PG_GAP = 5
+
+    PG_WINDOW_W = (PG_PIECE_W + PG_GAP) * BOARD_SIZE
+    PG_WINDOW_H = (PG_PIECE_H + PG_GAP)
 
     def __init__(self):
         super().__init__("line_world")
@@ -53,18 +64,31 @@ class LineWorld(BaseEnv):
     
     def render(self) -> None:
         if not self._pygame_initialized:
-            pygame.init()
-            self.scrn = pygame.display.set_mode((500, 100))
-            pygame.display.set_caption("LineWorld")
-            self._pygame_initialized = True
+            self._init_pygame()
 
-        self.scrn.fill((30, 30, 30))
+        self.screen.fill((30, 30, 30))
 
-        for i in range(5):
-            color = (80, 200, 80) if i == self.agent_pos else (80, 80, 80)
-            pygame.draw.rect(self.scrn, color, (i * 100, 10, 80, 80))
-
+        for i in range(self.BOARD_SIZE):
+            self.pg_board[i].image = None
+            if i == self.agent_pos:
+                self.pg_board[i].image = self.pg_assets
+            self.pg_board[i].draw(self.screen)
         pygame.display.flip()
+
+    def _init_pygame(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        pygame.display.set_caption("LineWorld")
+        self._pygame_initialized = True
+
+        self.pg_assets = pygame.transform.scale(
+                pygame.image.load(f"{settings.line_world_assets_path}/1.png"),
+                (self.PG_PIECE_W, self.PG_PIECE_H)
+            )
+
+        self.pg_board   = [ImageButton(x = c * self.PG_PIECE_W + c * self.PG_GAP, y = 0,
+                                        width = self.PG_PIECE_W, height = self.PG_PIECE_H)
+                            for c in range(self.BOARD_SIZE)]
 
     def _play(self):
         self.reset()
