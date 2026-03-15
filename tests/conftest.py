@@ -15,6 +15,9 @@ def line_world():
 def quarto_env():
     return QuartoEnv()
 
+@pytest.fixture
+def tictactoe_env():
+    return TicTacToe()
 
 @pytest.fixture
 def policy_net():
