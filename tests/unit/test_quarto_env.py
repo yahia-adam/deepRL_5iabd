@@ -17,8 +17,7 @@ class TestQuartoReset:
     def test_available_full_at_start(self, env):
         """Les 16 pièces doivent être disponibles au départ."""
         # Aucune cellule dans available ne doit avoir first attr = -1
-        count_available = np.sum(env.available[:, :, 0] != -1)
-        assert count_available == 16
+        assert np.all(env.available != -1)
 
     def test_selecting_is_true_at_start(self, env):
         """Au démarrage, la phase est 'choisir une pièce'."""
@@ -44,8 +43,7 @@ class TestQuartoReset:
         """reset() doit restaurer les 16 pièces disponibles."""
         env.step(0)  # retire une pièce
         env.reset()
-        count_available = np.sum(env.available[:, :, 0] != -1)
-        assert count_available == 16
+        assert np.all(env.available != -1)
 
 
 class TestQuartoActionSpace:

@@ -13,13 +13,13 @@ class TestLineWorldReset:
         """La position initiale doit être 2 (centre)."""
         assert env.agent_pos == 2
 
-    def test_reset_restores_initial_position(self, env):
+    def test_reset_step_1_reset(self, env):
         """reset() doit ramener l'agent en position 2."""
         env.step(1)  # se déplacer
         env.reset()
         assert env.agent_pos == 2
 
-    def test_reset_clears_game_over(self, env):
+    def test_reset_game_over_reset(self, env):
         """Après reset, le jeu ne doit pas être terminé."""
         env.agent_pos = 0  # état terminal
         env.reset()

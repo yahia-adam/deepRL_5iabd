@@ -89,12 +89,12 @@ class QuartoEnv(BaseEnv):
             cells = np.array([self.board[r, c] for r, c in pattern])
             if -1 not in cells and np.any(np.all(cells == cells[0], axis=0)):
                 return True
-        return bool(np.all(self.available[:, :, 0] == -1))
+        return bool(np.all(self.available == -1))
 
     def score(self) -> int:
         if not self.is_game_over():
             return 0
-        if np.all(self.available[:, :, 0] == -1):
+        if np.all(self.available == -1):
             return 0
         return 1 if self.player == 0 else -1
 
