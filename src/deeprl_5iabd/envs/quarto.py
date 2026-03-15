@@ -130,7 +130,7 @@ class QuartoEnv(BaseEnv):
         self.screen    = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
         self.pg_assets = {
             f"{i:04b}": pygame.transform.scale(
-                pygame.image.load(f"{settings.games_assets_path}/quarto_assets/{i:04b}.png"),
+                pygame.image.load(f"{settings.quarto_assets_path}/{i:04b}.png"),
                 (self.PG_PIECE_W, self.PG_PIECE_H)
             )
             for i in range(self.NUM_PIECES)

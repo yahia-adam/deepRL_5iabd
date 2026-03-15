@@ -9,8 +9,8 @@ class TicTacToe(BaseEnv):
 
     BOARD_SIZE = 3
 
-    PG_PIECE_W = 120
-    PG_PIECE_H = 120
+    PG_PIECE_W = 250
+    PG_PIECE_H = 250
     PG_GAP = 5
 
     TEXT_H = 40
@@ -107,13 +107,13 @@ class TicTacToe(BaseEnv):
         self.pg_assets = [
             pygame.transform.scale(
                 pygame.image.load(
-                    f"{settings.games_assets_path}/tictactoe_assets/0.jpg"
+                    f"{settings.tictactoe_assets_path}/0.png"
                 ),
                 (self.PG_PIECE_W, self.PG_PIECE_H),
             ),
             pygame.transform.scale(
                 pygame.image.load(
-                    f"{settings.games_assets_path}/tictactoe_assets/1.jpg"
+                    f"{settings.tictactoe_assets_path}/1.png"
                 ),
                 (self.PG_PIECE_W, self.PG_PIECE_H),
             ),
