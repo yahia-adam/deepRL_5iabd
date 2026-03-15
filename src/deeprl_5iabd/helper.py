@@ -1,32 +1,17 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 def get_default_device() -> str:
     if hasattr(torch, "accelerator") and torch.accelerator.is_available():
         return torch.accelerator.current_accelerator().type
     return "cpu"
 
-def softmax_with_mask(logits, mask):
-    if not isinstance(mask, torch.Tensor):
-        mask = torch.tensor(mask, device=logits.device).float()
-
-    # S'assurer que mask et logits ont la même forme [batch, 32]
-    mask = mask.view(logits.shape)
-
-    # 1. Stabilité numérique : on soustrait le max des logits
-    logits = logits - torch.max(logits, dim=-1, keepdim=True)[0]
-
-    # 2. Application du masque avec une valeur très petite
-    # On utilise -1e9 plutôt que -inf pour éviter certains bugs de calcul
-    masked_logits = logits.masked_fill(mask == 0, -1e9)
-
-    # 3. Calcul du Softmax
-    probs = F.softmax(masked_logits, dim=-1)
-
-    # 4. Sécurité : si tout est à zéro à cause du masque, 
-    # on force une distribution uniforme sur les actions autorisées
-    if torch.isnan(probs).any() or probs.sum() <= 0:
-        # On met 1 là où c'est autorisé, 0 ailleurs
-        probs = mask / (mask.sum(dim=-1, keepdim=True) + 1e-9)
-
-    return probs
+def softmax_with_mask(S, M):
+    M = torch.tensor(M, dtype=S.dtype, device=S.device)
+    positive_or_null_s = S - S.min()
+    masked_positive_or_null_s = positive_or_null_s * M
+    negative_or_null_s = masked_positive_or_null_s - masked_positive_or_null_s.max()
+    exp_s = torch.exp(negative_or_null_s)
+    masked_exp_s = exp_s * M
+    return masked_exp_s / masked_exp_s.sum()
