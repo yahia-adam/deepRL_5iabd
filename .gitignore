@@ -1,7 +1,10 @@
+mes_notes.md
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
+experimentation_logs/models/
+experimentation_logs/train_logs/
 
 # C extensions
 *.so
