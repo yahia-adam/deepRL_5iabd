@@ -14,4 +14,4 @@ if __name__ == "__main__":
         experiment_name="Quarto_REINFORCE_vs_Random"
     )
 
-    model = reinforce(env=env, opponent_model=opponent_model, reinforce_agent=model, logger=logger, num_episodes=2000)
+    model = reinforce(env=env, opponent_model=opponent_model, reinforce_agent=model, logger=logger)

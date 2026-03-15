@@ -15,22 +15,17 @@ def reinforce(env: BaseEnv,
               num_episodes: int = 100_000,
               lr: float = 0.001,
               gamma: float = 0.99,
-              log_dir: str = settings.training_logs_path,
-              model_dir: str = settings.models_path,
-              model_name: str = "reinforce",
               early_stop = False,
               early_stop_val = 0.6,
         ):
 
     optimizer = optim.Adam(reinforce_agent.parameters(), lr=lr)
-    # writer = SummaryWriter()
 
     nbr_win, nbr_loss, nbr_draw = 0, 0, 0
     for epoch in range(1, num_episodes):
-        env.reset()
-        states, actions, rewards = [], [], []
-        log_probs = []
+        log_probs, rewards = [], []
 
+        env.reset()
         while not env.is_game_over():
             if env.player == 0:
                 mask = env.get_action_space()
@@ -41,8 +36,6 @@ def reinforce(env: BaseEnv,
                 probs_dist = Categorical(probs)
                 action_pos = probs_dist.sample()
 
-                states.append(np_state)
-                actions.append(action_pos.item())
                 log_probs.append(probs_dist.log_prob(action_pos))
 
                 env.step(action_pos.item())
@@ -54,17 +47,15 @@ def reinforce(env: BaseEnv,
                 action_pos = probs_dist.sample()
                 env.step(action_pos.item())
 
+        G = 0
+        returns = []
+        for r in reversed(rewards):
+            G = r + gamma * G
+            returns.insert(0, G)
+
         loss = 0
-        for t in range(len(states)):
-            # G := somme des gamma^k * R_k
-            G = 0
-            pw = 0
-            for k in range(t, len(rewards)):
-                G += (gamma ** pw) * rewards[k]
-                pw += 1
-            
-            # loss = theta + alpha * gamma^t * G * grad ln(pi)
-            loss += - (gamma ** t) * G * log_probs[t]
+        for log_prob, G in zip(log_probs, returns):
+            loss += -log_prob * G
 
         optimizer.zero_grad()
         loss.backward()
@@ -82,7 +73,7 @@ def reinforce(env: BaseEnv,
             metrics = {
                 "Train/Loss": loss.item(),
                 "Train/WinRate": nbr_win / epoch,
-                "Train/EpisodeLength": len(states)
+                "Train/EpisodeLength": len(rewards)
             }
             logger.log_dict(metrics, step=epoch)
             
