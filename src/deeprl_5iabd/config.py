@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     training_logs_dir: str = "experimentation_logs/train_logs"
 
     line_world_assets_dir: str = "game_assets/line_world/v1"
+    grid_world_assets_dir: str = "game_assets/grid_world/v1"
     tictactoe_assets_dir: str = "game_assets/tictactoe/v1"
     quarto_assets_dir: str = "game_assets/quarto/v1"
 
@@ -37,6 +38,11 @@ class Settings(BaseSettings):
     @property
     def line_world_assets_path(self) -> Path:
         return self.project_path / self.line_world_assets_dir
+
+    @computed_field
+    @property
+    def grid_world_assets_path(self) -> Path:
+        return self.project_path / self.grid_world_assets_dir
 
     @computed_field
     @property

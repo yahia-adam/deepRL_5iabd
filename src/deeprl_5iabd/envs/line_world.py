@@ -55,6 +55,7 @@ class LineWorld(BaseEnv):
         return [self.agent_pos]
  
     def get_action_space(self) -> list[int]:
+        """0: gauche, 1: droite"""
         action = [1,1]
         if self.agent_pos == 0:
             action[0] = 0
@@ -71,20 +72,24 @@ class LineWorld(BaseEnv):
         for i in range(self.BOARD_SIZE):
             self.pg_board[i].image = None
             if i == self.agent_pos:
-                self.pg_board[i].image = self.pg_assets
+                self.pg_board[i].image = self.pg_assets[self.last_action]
             self.pg_board[i].draw(self.screen)
         pygame.display.flip()
 
     def _init_pygame(self):
         pygame.init()
+        self.last_action = 1
         self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
         pygame.display.set_caption("LineWorld")
         self._pygame_initialized = True
 
-        self.pg_assets = pygame.transform.scale(
-                pygame.image.load(f"{settings.line_world_assets_path}/1.png"),
+        self.pg_assets = [
+            pygame.transform.scale(
+                pygame.image.load(f"{settings.line_world_assets_path}/{i}.png"),
                 (self.PG_PIECE_W, self.PG_PIECE_H)
             )
+            for i in range(0, 2)
+        ]
 
         self.pg_board   = [ImageButton(x = c * self.PG_PIECE_W + c * self.PG_GAP, y = 0,
                                         width = self.PG_PIECE_W, height = self.PG_PIECE_H)
@@ -103,10 +108,13 @@ class LineWorld(BaseEnv):
                     if event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_LEFT:
                             action = 0
+                            self.last_action = action
+                            self.step(action)
                         elif event.key == pygame.K_RIGHT:
                             action = 1
-            self.step(action)
-        self.render()
+                            self.last_action = action
+                            self.step(action)
+                        self.render()
 
 if __name__ == "__main__":
     env = LineWorld()

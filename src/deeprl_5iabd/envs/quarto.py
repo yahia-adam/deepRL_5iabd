@@ -59,6 +59,7 @@ class QuartoEnv(BaseEnv):
         self.selecting = not self.selecting
 
     def get_action_space(self) -> list[int]:
+        """0-15: choisir pièce, 16-31: placer pièce"""
         empty = [0] * self.NUM_PIECES
 
         if self.selecting:
