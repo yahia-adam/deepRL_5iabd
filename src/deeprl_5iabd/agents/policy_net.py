@@ -1,3 +1,4 @@
+import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -37,6 +38,19 @@ class PolicyNetwork(nn.Module, BaseAgent):
             "config": self.config
         }
         torch.save(checkpoint, path)
+
+    def clone(self, name=None):
+        new_name = name if name else f"{self.name}_copy"
+        cloned_model = PolicyNetwork(
+            name=new_name, 
+            input_size=self.config["input_size"], 
+            output_size=self.config["output_size"], 
+            hiddenlayers=self.config["hiddenlayers"]
+        )
+        
+        cloned_model.load_state_dict(copy.deepcopy(self.state_dict()))
+        cloned_model.eval() 
+        return cloned_model
 
     @classmethod
     def load(cls, filename):

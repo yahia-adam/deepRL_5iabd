@@ -9,6 +9,10 @@ class BaseAgent(ABC):
     def save(self, filename):
         raise NotImplementedError
 
+    @abstractmethod
+    def clone(self):
+        raise NotImplementedError
+
     @classmethod
     @abstractmethod
     def load(cls, filename):

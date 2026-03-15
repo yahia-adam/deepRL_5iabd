@@ -4,6 +4,7 @@ from deeprl_5iabd.helper import softmax_with_mask
 
 class RandomPlayer(BaseAgent):
     def __init__(self, action_dim):
+        self.name = "RandomPlayer"
         self.action_dim = action_dim
 
     def forward(self, x, mask):
@@ -12,7 +13,11 @@ class RandomPlayer(BaseAgent):
 
     def save(self, filename):
         print("Random player is not a model, it is a random policy")
-        
+
+    def clone(self):
+        print("")
+        return self
+
     @classmethod
     def load(cls, filename):
         print("Random player is not a model, it is a random policy")

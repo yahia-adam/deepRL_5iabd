@@ -21,28 +21,28 @@ def reinforce(env: BaseEnv,
 
     optimizer = optim.Adam(reinforce_agent.parameters(), lr=lr)
 
-    nbr_win, nbr_loss, nbr_draw = 0, 0, 0
-    for epoch in range(1, num_episodes):
+    win_history = [] 
+    window_size = 100
+
+    for epoch in range(1, num_episodes + 1):
         log_probs, rewards = [], []
 
         env.reset()
         while not env.is_game_over():
+            mask = env.get_action_space()
+            np_state = env.get_observation_space()
+            tensor_state = torch.tensor(np_state).float()
             if env.player == 0:
-                mask = env.get_action_space()
-                np_state = env.get_observation_space()
-
-                tensor_state = torch.tensor(np_state).float()
                 probs = reinforce_agent.forward(tensor_state, mask)
                 probs_dist = Categorical(probs)
                 action_pos = probs_dist.sample()
+                env.step(action_pos.item())
 
                 log_probs.append(probs_dist.log_prob(action_pos))
-
-                env.step(action_pos.item())
                 rewards.append(env.score())
             else:
-                mask = env.get_action_space()
-                probs = opponent_model.forward(x=None, mask=mask)
+                with torch.no_grad():
+                    probs = opponent_model.forward(x=tensor_state, mask=mask)
                 probs_dist = Categorical(probs)
                 action_pos = probs_dist.sample()
                 env.step(action_pos.item())
@@ -62,23 +62,28 @@ def reinforce(env: BaseEnv,
         optimizer.step()
 
         score = env.score()
-        if score == 1:
-            nbr_win += 1
-        elif score == -1:
-            nbr_loss += 1
-        else:
-            nbr_draw += 1
+        current_win = 1 if score == 1 else 0
+        win_history.append(current_win)
+        if len(win_history) > window_size:
+            win_history.pop(0)
+        rolling_win_rate = sum(win_history) / len(win_history)
 
         if logger is not None:
             metrics = {
                 "Train/Loss": loss.item(),
-                "Train/WinRate": nbr_win / epoch,
+                "Train/WinRate_Rolling": rolling_win_rate,
                 "Train/EpisodeLength": len(rewards)
             }
             logger.log_dict(metrics, step=epoch)
-            
-        if epoch % 100 == 0:
-            print(f"Manche {epoch} | Gain {nbr_win/epoch:.2f} | Loss {loss.item():.4f}")
+        
+        if early_stop and len(win_history) >= window_size:
+            if rolling_win_rate >= early_stop_val:
+                print(f"\n[EARLY STOP] Objectif atteint à l'époque {epoch} !")
+                print(f"Win Rate sur les {window_size} derniers matchs : {rolling_win_rate:.2f}")
+                break
+
+        if epoch % window_size == 0:
+            print(f"Manche {epoch} | Win Rate {rolling_win_rate} | Loss {loss.item():.4f}")
 
     if logger is not None:
         logger.close()
