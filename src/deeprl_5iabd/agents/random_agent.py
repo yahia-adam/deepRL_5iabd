@@ -14,9 +14,8 @@ class RandomPlayer(BaseAgent):
     def save(self, filename):
         print("Random player is not a model, it is a random policy")
 
-    def clone(self):
-        print("")
-        return self
+    def clone(self, name=None):
+        return RandomPlayer(action_dim=self.action_dim)
 
     @classmethod
     def load(cls, filename):

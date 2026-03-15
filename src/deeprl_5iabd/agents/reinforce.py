@@ -12,17 +12,17 @@ def reinforce(env: BaseEnv,
               opponent_model: BaseAgent,
               reinforce_agent: BaseAgent,
               logger: BaseLogger | None = None,
-              num_episodes: int = 100_000,
+              num_episodes: int = 5_000,
               lr: float = 0.001,
               gamma: float = 0.99,
               early_stop = False,
-              early_stop_val = 0.6,
+              early_stop_val = 0.65,
         ):
 
     optimizer = optim.Adam(reinforce_agent.parameters(), lr=lr)
 
     win_history = [] 
-    window_size = 100
+    window_size = 1_000
 
     for epoch in range(1, num_episodes + 1):
         log_probs, rewards = [], []
@@ -52,6 +52,10 @@ def reinforce(env: BaseEnv,
         for r in reversed(rewards):
             G = r + gamma * G
             returns.insert(0, G)
+
+        returns = torch.tensor(returns).float()
+        if len(returns) > 1:
+            returns = (returns - returns.mean()) / (returns.std() + 1e-8)
 
         loss = 0
         for log_prob, G in zip(log_probs, returns):
