@@ -13,7 +13,11 @@ class Settings(BaseSettings):
 
     models_dir: str = "experimentation_logs/models"
     training_logs_dir: str = "experimentation_logs/train_logs"
-    games_assets_dir: str = "game_assets"
+
+    line_world_assets_dir: str = "game_assets/line_world/v1"
+    grid_world_assets_dir: str = "game_assets/grid_world/v1"
+    tictactoe_assets_dir: str = "game_assets/tictactoe/v1"
+    quarto_assets_dir: str = "game_assets/quarto/v1"
 
     @computed_field
     @property
@@ -32,8 +36,23 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def games_assets_path(self) -> Path:
-        return self.project_path / self.games_assets_dir
+    def line_world_assets_path(self) -> Path:
+        return self.project_path / self.line_world_assets_dir
+
+    @computed_field
+    @property
+    def grid_world_assets_path(self) -> Path:
+        return self.project_path / self.grid_world_assets_dir
+
+    @computed_field
+    @property
+    def tictactoe_assets_path(self) -> Path:
+        return self.project_path / self.tictactoe_assets_dir
+
+    @computed_field
+    @property
+    def quarto_assets_path(self) -> Path:
+        return self.project_path / self.quarto_assets_dir
 
     def setup_directories(self) -> None:
         self.models_path.mkdir(parents=True, exist_ok=True)

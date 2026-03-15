@@ -3,20 +3,7 @@ import numpy as np
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.envs.base_env import BaseEnv
 from deeprl_5iabd.agents.random_agent import RandomPlayer
-
-class QuartoButton:
-    def __init__(self, x, y, width, height):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.image = None
-
-    def draw(self, screen):
-        if self.image:
-            screen.blit(self.image, self.rect)
-        else:
-            pygame.draw.rect(screen, (200, 200, 200), self.rect)
-
-    def is_clicked(self, event):
-        return event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos)
+from deeprl_5iabd.helper import ImageButton
 
 class QuartoEnv(BaseEnv):
     BOARD_SIZE    = 4
@@ -72,6 +59,7 @@ class QuartoEnv(BaseEnv):
         self.selecting = not self.selecting
 
     def get_action_space(self) -> list[int]:
+        """0-15: choisir pièce, 16-31: placer pièce"""
         empty = [0] * self.NUM_PIECES
 
         if self.selecting:
@@ -130,24 +118,24 @@ class QuartoEnv(BaseEnv):
         self.screen    = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
         self.pg_assets = {
             f"{i:04b}": pygame.transform.scale(
-                pygame.image.load(f"{settings.games_assets_path}/quarto_assets/{i:04b}.png"),
+                pygame.image.load(f"{settings.quarto_assets_path}/{i:04b}.png"),
                 (self.PG_PIECE_W, self.PG_PIECE_H)
             )
             for i in range(self.NUM_PIECES)
         }
         self.pg_assets["-1-1-1-1"] = None
 
-        self.pg_board   = [[QuartoButton(c * (self.PG_PIECE_W + self.PG_GAP),
+        self.pg_board   = [[ImageButton(c * (self.PG_PIECE_W + self.PG_GAP),
                                          (r + 1) * (self.PG_PIECE_H + self.PG_GAP),
                                          self.PG_PIECE_W, self.PG_PIECE_H)
                             for c in range(4)] for r in range(4)]
 
-        self.pg_pieces  = [[QuartoButton((c + 5) * (self.PG_PIECE_W + self.PG_GAP),
+        self.pg_pieces  = [[ImageButton((c + 5) * (self.PG_PIECE_W + self.PG_GAP),
                                          (r + 1) * (self.PG_PIECE_H + self.PG_GAP),
                                          self.PG_PIECE_W, self.PG_PIECE_H)
                             for c in range(4)] for r in range(4)]
 
-        self.pg_selected = QuartoButton(self.PG_WINDOW_W - self.PG_PIECE_W, 0,
+        self.pg_selected = ImageButton(self.PG_WINDOW_W - self.PG_PIECE_W, 0,
                                         self.PG_PIECE_W, self.PG_PIECE_H)
 
     # Game modes
