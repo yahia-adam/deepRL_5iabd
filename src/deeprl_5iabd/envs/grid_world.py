@@ -21,7 +21,7 @@ class GridWorld(BaseEnv):
         self._pygame_initialized = False
 
     def reset(self) -> None:
-        self.board = np.zeros((self.BOARD_SIZE, self.BOARD_SIZE))
+        self.board = np.full((self.BOARD_SIZE, self.BOARD_SIZE), -1)
         self.agent_pos = (0, 0)
         self.board[self.agent_pos] = 1
 
@@ -45,7 +45,10 @@ class GridWorld(BaseEnv):
 
     def step(self, action: int) -> None:
         """0: bas, 1: haut, 2: droite, 3: gauche"""
-        self.board[self.agent_pos] = 0
+        if self.get_action_space()[action] == 0:
+            return
+
+        self.board[self.agent_pos] = -1
         if action == 0:
             self.agent_pos = (self.agent_pos[0] + 1, self.agent_pos[1])
         elif action == 1:
