@@ -157,6 +157,26 @@ class QuartoEnv(BaseEnv):
         self.render()
         print({0: "Match nul", 1: "Random a gagné", -1: "Vous avez gagné"}[self.score()])
 
+
+    # Game modes
+    def player1_vs_player2(self):
+        agent   = RandomPlayer(action_dim=self.NUM_PIECES * 2)
+        running = True
+        self.render()
+
+        while running:
+            if self.player == 0:
+                action = self._wait_for_human_click()
+            else:
+                action = self._wait_for_human_click()
+
+            self.step(action)
+            self.render()
+            running = not self.is_game_over()
+
+        self.render()
+        print({0: "Match nul", 1: "Random a gagné", -1: "Vous avez gagné"}[self.score()])
+
     def _wait_for_human_click(self) -> int:
         while True:
             for event in pygame.event.get():
@@ -171,7 +191,7 @@ class QuartoEnv(BaseEnv):
                             return r * 4 + c + offset
 
 def main():
-    QuartoEnv().play_vs_random()
+    QuartoEnv().player1_vs_player2()
 
 if __name__ == "__main__":
     main()
