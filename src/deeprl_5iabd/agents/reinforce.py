@@ -2,8 +2,6 @@ import torch
 from torch import optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from deeprl_5iabd.config import settings
-from deeprl_5iabd.helper import softmax_with_mask
 from deeprl_5iabd.envs.base_env import BaseEnv
 from deeprl_5iabd.agents.base_agent import BaseAgent
 from deeprl_5iabd.tracking.base_logger import BaseLogger

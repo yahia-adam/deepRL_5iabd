@@ -9,6 +9,7 @@ from deeprl_5iabd.agents.reinforce import reinforce
 from deeprl_5iabd.agents.policy_net import PolicyNetwork
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 from deeprl_5iabd.tracking.tb_logger import TensorBoardLogger
+from torch.distributions import Categorical
 
 def count_n_match_time(env: BaseEnv, num_episode):
     player = RandomPlayer(action_dim=len(env.get_action_space()))
@@ -16,10 +17,12 @@ def count_n_match_time(env: BaseEnv, num_episode):
     
     i = 0
     while (i <= num_episode):
-        while (env.is_game_over()):
+        while (not env.is_game_over()):
             action_spaces = env.get_action_space()
-            a = player.forward(x=None, mask=action_spaces)
-            env.step(a)
+            probs = player.forward(x=None, mask=action_spaces)
+            probs_dist = Categorical(probs)
+            action_pos = probs_dist.sample()
+            env.step(action_pos.item())
         i += 1
     e = perf_counter()
 

@@ -191,7 +191,7 @@ class QuartoEnv(BaseEnv):
                             return r * 4 + c + offset
 
 def main():
-    QuartoEnv().player1_vs_player2()
+    QuartoEnv().play_vs_random()
 
 if __name__ == "__main__":
     main()
