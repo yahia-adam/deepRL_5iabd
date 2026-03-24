@@ -52,14 +52,7 @@ class TicTacToe(BaseEnv):
         return self.board.flatten().tolist()
 
     def get_action_space(self):
-        action_space = []
-        for r in range(3):
-            for c in range(3):
-                if self.board[r, c] == -1:
-                    action_space.append(1)
-                else:
-                    action_space.append(0)
-        return action_space
+        return (self.board.flatten() == -1).astype(int)
 
     def step(self, action: int) -> None:
         r, c = divmod(action, 3)
