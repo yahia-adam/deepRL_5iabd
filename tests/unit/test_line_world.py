@@ -25,6 +25,47 @@ class TestLineWorldReset:
         env.reset()
         assert not env.is_game_over()
 
+class TestLineWorldModelBasedEnvMethods:
+    def test_init_variables(self, env):
+        assert env.A == [0, 1]
+        assert env.R == [-1, 0, 1]
+        assert env.T == [[0], [4]]
+        assert env.p_matrix.shape == (5, 2, 5, 3)
+
+    def test_p_matrix(self, env):
+        assert env.p_matrix[1, 0, 0, 0] == 1
+        assert env.p_matrix[2, 0, 1, 1] == 1
+        assert env.p_matrix[3, 0, 2, 1] == 1
+        assert env.p_matrix[1, 1, 2, 1] == 1
+        assert env.p_matrix[2, 1, 3, 1] == 1
+        assert env.p_matrix[3, 1, 4, 2] == 1
+
+    def test_state_id(self, env):
+        assert env.state_id([0]) == 0
+        assert env.state_id([1]) == 1
+        assert env.state_id([2]) == 2
+        assert env.state_id([3]) == 3
+        assert env.state_id([4]) == 4
+
+    def test_num_states(self, env):
+        assert env.num_states() == 5
+
+    def test_num_actions(self, env):
+        assert env.num_actions() == 2
+
+    def test_num_rewards(self, env):
+        assert env.num_rewards() == 3
+
+    def test_available_actions_state_2(self, env):
+        assert env.available_actions() == [0, 1]
+
+    def test_available_actions_state_0(self, env):
+        env.agent_pos = 0
+        assert env.available_actions() == []
+
+    def test_available_actions_state_4(self, env):
+        env.agent_pos = 4
+        assert env.available_actions() == []
 
 class TestLineWorldStep:
     def test_step_left(self, env):

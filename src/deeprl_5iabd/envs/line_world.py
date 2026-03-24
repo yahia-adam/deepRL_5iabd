@@ -1,9 +1,10 @@
 import pygame
+import numpy as np
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
-from deeprl_5iabd.envs.base_env import BaseEnv
+from deeprl_5iabd.envs.model_based_env import ModelBasedEnv
 
-class LineWorld(BaseEnv):
+class LineWorld(ModelBasedEnv):
     """Environnement 1D : ligne de 5 positions (0-4).
     - Position 0 : récompense -1 (terminal)
     - Position 4 : récompense +1 (terminal)
@@ -23,7 +24,37 @@ class LineWorld(BaseEnv):
     def __init__(self):
         super().__init__("line_world")
         self.agent_pos = 2
+        self.T = [[0], [4]]
+        self.A = [0, 1]  # 0: gauche, 1: droite
+        self.R = [-1, 0, 1]
+
+        self.p_matrix = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
+        self.p_matrix[1, 0, 0, 0] = 1 # S=1, A=gauche, S'=0, R=-1
+        self.p_matrix[2, 0, 1, 1] = 1 # S=2, A=gauche, S'=1, R=0
+        self.p_matrix[3, 0, 2, 1] = 1 # S=3, A=gauche, S'=2, R=0
+
+        self.p_matrix[1, 1, 2, 1] = 1 # S=1, A=droite, S'=2, R=0
+        self.p_matrix[2, 1, 3, 1] = 1 # S=2, A=droite, S'=3, R=0
+        self.p_matrix[3, 1, 4, 2] = 1 # S=3, A=droite, S'=4, R=1
+
         self._pygame_initialized = False
+
+    def num_states(self):
+        return 5
+
+    def num_actions(self):
+        return 2
+
+    def num_rewards(self):
+        return 3
+
+    def available_actions(self) -> list[int]:
+        if self.is_game_over():
+            return []
+        return self.A
+
+    def state_id(self, state) -> int:
+        return state[0]
 
     def reset(self):
         self.agent_pos = 2
