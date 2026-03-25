@@ -22,6 +22,3 @@ class ModelBasedEnv(BaseEnv, ABC):
     @abstractmethod
     def state_id(self, state) -> int:
         pass
-
-    def p(self, s: int, a: int, s_p: int, r_index: int) -> float:
-        return self.p_matrix[s, a, s_p, r_index]

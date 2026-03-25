@@ -94,7 +94,7 @@ class TestGridWorldActionSpace:
                 env.step(2)
             env.reset()
 
-class TestTicTacToeStep:
+class TestGridWordStep:
     def test_step_down(self, env):
         """quand l'agent va en bas, il change de position et l'ancienne position est vide"""
         env.step(0)
@@ -143,59 +143,41 @@ class TestGridWorldObservationSpace:
     def test_observation_space_length(self, env):
         """L'observation doit avoir 25 valeurs."""
         obs = env.get_observation_space()
-        assert len(obs) == 25
+        assert len(obs) == 2
 
     def test_observation_values_at_start(self, env):
-        """get_observation_space() doit retourner une liste de 1 a 0 puis que des -1."""
         obs = env.get_observation_space()
-        assert obs[0] == 1
-        assert all(x == -1 for x in obs[1:])
+        assert obs[0] == 0
+        assert obs[1] == 0
 
     def test_observation_is_list(self, env):
-        """get_observation_space() doit retourner une liste Python."""
         obs = env.get_observation_space()
         assert isinstance(obs, list)
-
-    def test_observation_values(self, env):
-        """get_observation_space() doit retourner une liste de -1 et 1."""
-        obs = env.get_observation_space()
-        assert all(x in [-1, 1] for x in obs)
-
-    def test_observation_sum(self, env):
-        """get_observation_space() doit retourner une liste donc la sum == -23"""
-        obs = env.get_observation_space()
-        assert sum(obs) == -23
-
-    def test_observation_sum_after_step(self, env):
-        """get_observation_space() doit retourner une liste donc la sum == -23"""
-        env.step(0)
-        obs = env.get_observation_space()
-        assert sum(obs) == -23
 
     def test_observation_step_down(self, env):
         """quand l'agent va en bas, il change de position et l'ancienne position est vide"""
         env.step(0)
         obs = env.get_observation_space()
-        assert obs[0] == -1
-        assert obs[5] == 1
+        assert obs[0] == 1
+        assert obs[1] == 0
 
     def test_observation_step_down_then_up(self, env):
         """quand l'agent va en bas puis en haut, il change de position et l'ancienne position est vide"""
         env.step(0)
         obs = env.get_observation_space()
-        assert obs[0] == -1
-        assert obs[5] == 1
+        assert obs[0] == 1
+        assert obs[1] == 0
 
         env.step(1)
         obs = env.get_observation_space()
-        assert obs[0] == 1
-        assert obs[5] == -1
+        assert obs[0] == 0
+        assert obs[1] == 0
 
     def test_observation_step_right(self, env):
         """quand l'agent va à droit, il change de position et l'ancienne position est vide"""
         env.step(2)
         obs = env.get_observation_space()
-        assert obs[0] == -1
+        assert obs[0] == 0
         assert obs[1] == 1
 
     def test_observation_step_right_then_left(self, env):
@@ -203,15 +185,15 @@ class TestGridWorldObservationSpace:
         
         env.step(2)
         obs = env.get_observation_space()
-        assert obs[0] == -1
+        assert obs[0] == 0
         assert obs[1] == 1
 
         env.step(3)
         obs = env.get_observation_space()
-        assert obs[0] == 1
-        assert obs[5] == -1
+        assert obs[0] == 0
+        assert obs[1] == 0
 
-class TestTicTacToeGameOver:
+class TestGridWorldGameOver:
     def test_not_game_over_at_start(self, env):
         """Le jeu n'est pas terminé tans qu'on est pas en haut a droit ou en bas a droit"""
         T = [(0,4), (4,4)]
@@ -254,7 +236,7 @@ class TestGridWorldScore:
         """Le score doit être 5 quand l'agent est en (0,4)."""
         for _ in range(env.BOARD_SIZE - 1):
             env.step(2)
-        assert env.score() == 5
+        assert env.score() == 1
 
     def test_score_lose_minus_3_at_4_4(self, env):
         """Le score doit être -3 quand l'agent est en (4,4)."""

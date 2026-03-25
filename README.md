@@ -19,11 +19,12 @@ Projet d'implémentation d'algorithmes de Deep Reinforcement Learning et d'envir
 
 ## Commandes Utiles
 
-| Action                    | Commande                    |
-|---------------------------|-----------------------------|
-| **Installer les dépendances** | `uv sync`               |
-| **Activer l'environement** | `source .venv/bin/activate`               |
-| **Lancer un script**      | `uv run python -m mypythonlib.envs.quarto`|
+| Action                    | Commande                                                                 |
+|---------------------------|--------------------------------------------------------------------------|
+| **clonner le projet**     | `git clone git@github.com:yahia-adam/deepRL_5iabd.git && cd deepRL_5iabd`|
+| **Installer les dépendances** | `uv sync`                                                            |
+| **Activer l'environement** | `source .venv/bin/activate`                                             |
+| **Lancer un script**      | `uv run python -m mypythonlib.envs.quarto`                               |
 
 ---
 

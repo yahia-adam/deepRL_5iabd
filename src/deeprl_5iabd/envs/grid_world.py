@@ -1,11 +1,11 @@
 import pygame
 import numpy as np
-from deeprl_5iabd.envs.base_env import BaseEnv
+from deeprl_5iabd.envs.model_based_env import ModelBasedEnv
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 
-class GridWorld(BaseEnv):
+class GridWorld(ModelBasedEnv):
     BOARD_SIZE = 5
 
     PG_PIECE_W = 150
@@ -18,7 +18,29 @@ class GridWorld(BaseEnv):
     def __init__(self):
         super().__init__("GridWorld")
         self.reset()
+        self.T = [(0,4), (4,4)]
+        self.A = [0, 1, 2, 3]     # 0=bas, 1=haut, 2=droite, 3=gauche
+        self.R = [-3.0, 0.0, 1.0]
+        self.p_matrix = self._create_p_matrix()
         self._pygame_initialized = False
+
+    def num_states(self):
+        return 25
+
+    def num_actions(self):
+        return 4
+
+    def num_rewards(self):
+        return 3
+
+    def state_id(self, state) -> int:
+        return state[0] * self.BOARD_SIZE + state[1]
+
+    def available_actions(self) -> np.ndarray:
+        if self.is_game_over():
+            return np.array([])
+        am = self.get_action_space()
+        return np.array([a for a in self.A if am[a] == 1])
 
     def reset(self) -> None:
         self.board = np.full((self.BOARD_SIZE, self.BOARD_SIZE), -1)
@@ -29,7 +51,7 @@ class GridWorld(BaseEnv):
         return self.agent_pos == (4, 4) or self.agent_pos == (0, 4)
 
     def get_observation_space(self):
-        return self.board.flatten().tolist()
+        return list(self.agent_pos)
 
     def get_action_space(self) -> list[int]:
         picks = np.ones(4)
@@ -61,11 +83,11 @@ class GridWorld(BaseEnv):
 
     def score(self) -> int:
         if self.agent_pos == (4, 4):
-            return -3
+            return self.R[0]
         elif self.agent_pos == (0, 4):
-            return 5
+            return self.R[2]
         else:
-            return 0
+            return self.R[1]
 
     def render(self) -> None:
         if not self._pygame_initialized:
@@ -81,6 +103,51 @@ class GridWorld(BaseEnv):
                     self.pg_board[r][c].image = None
                 self.pg_board[r][c].draw(self.screen)
         pygame.display.flip()
+
+    def _create_p_matrix(self):
+        # 0=bas, 1=haut, 2=droite, 3=gauche
+        # 0=-3.0,  1=0.0,    2=1.0
+        # p[s, a, s_prime, r_idx]
+        p = np.zeros((25, 4, 25, 3))
+        terminal_ids = [4, 24]
+
+        down_border = [20, 21, 22, 23, 24]
+        up_border = [0, 1, 2, 3, 4]
+        left_border = [0, 5, 10, 15, 20]
+        right_border = [4, 9, 14, 19, 24]
+
+        for s in range(self.num_states()):
+            if s in terminal_ids:
+                continue
+
+            for a in range(4):
+                is_collision = False
+                next_s = s
+
+                if a == 0:
+                    is_collision = s in down_border
+                    next_s = s + 5
+                elif a == 1:
+                    is_collision = s in up_border
+                    next_s = s - 5
+                elif a == 2:
+                    is_collision = s in right_border
+                    next_s = s + 1
+                elif a == 3:
+                    is_collision = s in left_border
+                    next_s = s - 1
+
+                # la récompense
+                if is_collision:
+                    p[s, a, s, 1] = 1.0
+                else:
+                    r_idx = 1 # 0 par défaut
+                    if next_s == 4: r_idx = 2  # 1 (Goal)
+                    elif next_s == 24: r_idx = 0 # -3 (Trap)
+
+                    p[s, a, next_s, r_idx] = 1.0
+
+        return p
 
     def _init_pygame(self) -> None:
         pygame.init()

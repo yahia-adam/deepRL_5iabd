@@ -25,7 +25,7 @@ class LineWorld(ModelBasedEnv):
         super().__init__("line_world")
         self.agent_pos = 2
         self.T = [[0], [4]]
-        self.A = [0, 1]  # 0: gauche, 1: droite
+        self.A = [0, 1]
         self.R = [-1, 0, 1]
 
         self.p_matrix = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
@@ -47,11 +47,6 @@ class LineWorld(ModelBasedEnv):
 
     def num_rewards(self):
         return 3
-
-    def available_actions(self) -> list[int]:
-        if self.is_game_over():
-            return []
-        return self.A
 
     def state_id(self, state) -> int:
         return state[0]

@@ -56,16 +56,6 @@ class TestLineWorldModelBasedEnvMethods:
     def test_num_rewards(self, env):
         assert env.num_rewards() == 3
 
-    def test_available_actions_state_2(self, env):
-        assert env.available_actions() == [0, 1]
-
-    def test_available_actions_state_0(self, env):
-        env.agent_pos = 0
-        assert env.available_actions() == []
-
-    def test_available_actions_state_4(self, env):
-        env.agent_pos = 4
-        assert env.available_actions() == []
 
 class TestLineWorldStep:
     def test_step_left(self, env):

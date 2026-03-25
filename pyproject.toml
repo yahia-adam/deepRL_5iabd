@@ -5,10 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "icecream>=2.1.10",
     "ipython>=9.10.0",
     "numpy>=2.4.2",
     "pydantic-settings>=2.13.1",
     "pygame>=2.6.1",
+    "rich>=14.3.3",
     "tensorboard>=2.20.0",
     "torch>=2.10.0",
 ]
