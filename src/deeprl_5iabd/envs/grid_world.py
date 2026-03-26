@@ -108,8 +108,8 @@ class GridWorld(ModelBasedEnv):
         # 0=bas, 1=haut, 2=droite, 3=gauche
         # 0=-3.0,  1=0.0,    2=1.0
         # p[s, a, s_prime, r_idx]
-        p = np.zeros((25, 4, 25, 3))
-        terminal_ids = [4, 24]
+        p = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
+        terminal_ids = [self.state_id(t) for t in self.T]
 
         down_border = [20, 21, 22, 23, 24]
         up_border = [0, 1, 2, 3, 4]
@@ -120,7 +120,7 @@ class GridWorld(ModelBasedEnv):
             if s in terminal_ids:
                 continue
 
-            for a in range(4):
+            for a in range(self.num_actions()):
                 is_collision = False
                 next_s = s
 
