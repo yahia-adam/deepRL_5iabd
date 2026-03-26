@@ -11,7 +11,7 @@ from deeprl_5iabd.agents.q_learning import q_learning
 console = Console()
 
 def render_q_analysis(Q, env, board_flat, title="Analyse d'état"):
-    """Affiche une grille 3x3 avec les valeurs Q pour chaque case."""
+    """Affiche une grille 3x3 : Joueur 0 = ⭕ (Agent), Joueur 1 = ❌ (Random)."""
     s_id = env.state_id(board_flat)
     q_values = Q[s_id]
     
@@ -27,14 +27,18 @@ def render_q_analysis(Q, env, board_flat, title="Analyse d'état"):
             q_val = q_values[idx]
 
             if val == 0:
-                content = Text("\n❌\n(Joueur 0)", style="bold blue", justify="center")
-                style = "blue"
+                # Joueur 0 est maintenant le O (Cercle)
+                content = Text("\n⭕\n(Agent - P0)", style="bold green", justify="center")
+                style = "green"
             elif val == 1:
-                content = Text("\n⭕\n(Joueur 1)", style="bold red", justify="center")
+                # Joueur 1 est maintenant le X (Croix)
+                content = Text("\n❌\n(Random - P1)", style="bold red", justify="center")
                 style = "red"
             else:
-                # Couleur selon la qualité du coup
-                color = "green" if q_val == max(q_values) else "white"
+                # Case vide : on affiche la valeur Q
+                # On met en vert la case que l'IA préfère
+                is_best = (q_val == max(q_values[board_flat == -1])) if any(board_flat == -1) else False
+                color = "bright_green" if is_best else "white"
                 content = Text(f"\nQ: {q_val:.3f}\n(Vide)", style=f"bold {color}", justify="center")
                 style = "bright_black"
 
@@ -43,27 +47,17 @@ def render_q_analysis(Q, env, board_flat, title="Analyse d'état"):
     console.print(table)
 
 if __name__ == "__main__":
-    # 1. Initialisation de l'environnement
     env = TicTacToe()
     
-    # 2. Entraînement
-    console.print("[bold yellow]🚀 Entraînement du Q-Learning (100k épisodes)...[/bold yellow]")
-    # Note: Assure-toi que ton q_learning retourne bien la Q-Table
-    Q = q_learning(env=env, num_episodes=10, epsilon=0.2, learning_rate=0.1)
+    console.print("[bold yellow]🚀 Entraînement du Q-Learning (Agent ⭕ contre Random ❌)...[/bold yellow]")
+    Q = q_learning(env=env, num_episodes=100_000, epsilon=0.1, learning_rate=0.1, is_two_players=True)
     console.print("[bold green]✅ Entraînement terminé ![/bold green]")
 
-    # 3. Tests de "cerveau" de l'IA
-    # Situation A : L'IA (P0) doit finir la ligne du haut
-    win_move = np.array([0, 0, -1, 1, 1, -1, -1, -1, -1])
-    render_q_analysis(Q, env, win_move, "Test : Victoire immédiate (doit choisir Case 2)")
+    tests = [
+        (np.array([1, -1, 1, 0, 0, -1, -1, -1, -1]), "Finir ligne milieu"),
+        (np.array([1, 1, -1, 0, -1, -1, -1, -1, -1]), "Bloquer ligne haut"),
+        (np.array([1, -1, -1, -1, 0, -1, -1, -1, 1]), "Contrer fourchette coins"),
+    ]
 
-    # Situation B : L'IA (P0) doit bloquer P1 en bas
-    block_move = np.array([0, -1, -1, -1, 0, -1, 1, 1, -1])
-    render_q_analysis(Q, env, block_move, "Test : Blocage défensif (doit choisir Case 8)")
-
-    # 4. Lancement du jeu interactif
-    console.print("\n[bold magenta]🎮 Lancement de l'interface Pygame...[/bold magenta]")
-    
-    # Pour jouer contre ton agent Q-Learning, 
-    # tu peux modifier play_vs_random dans TicTacToe pour utiliser ta Q-Table
-    env.play_vs_random()
+    for board, desc in tests:
+        render_q_analysis(Q, env, board, desc)

@@ -71,3 +71,13 @@ Gen 2 apprend à jouer "Feuille" pour battre la Gen 1. Elle gagne à 100%.
 Gen 3 apprend à jouer "Ciseaux" pour battre la Gen 2. Elle gagne à 100%.
 
 Le drame : La Gen 3 a complètement oublié comment battre "Pierre" (Gen 1), car elle n'a vu que des "Feuilles" pendant tout son entraînement !
+
+
+# grid word 
+
+![alt text](image.png)
+
+
+# tic tact toe
+
+![alt text](image-2.png)
