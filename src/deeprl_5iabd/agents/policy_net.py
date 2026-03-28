@@ -13,7 +13,7 @@ class PolicyNetwork(nn.Module, BaseAgent):
 
         if hiddenlayers is None or len(hiddenlayers) == 0:
             hiddenlayers = [512, 256, 128]
-        
+
         self.layers = nn.ModuleList()
         self.layers.append(nn.Linear(input_size, hiddenlayers[0]))
         for i in range(1, len(hiddenlayers)):

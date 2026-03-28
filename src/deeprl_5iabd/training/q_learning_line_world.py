@@ -9,11 +9,8 @@ from deeprl_5iabd.agents.q_learning import q_learning
 console = Console()
 
 def get_q_color(val: float, q_values: np.ndarray) -> str:
-    """
-    Même logique de couleur que pour le GridWorld pour la cohérence.
-    """
     diff = val - np.mean(q_values)
-    intensity = min(abs(diff) / 5.0, 1.0) # Seuil d'intensité
+    intensity = min(abs(diff) / 5.0, 1.0)
 
     if diff >= 0:
         r = int(200 - intensity * 150)
@@ -30,7 +27,6 @@ def render_lineworld_rich(Q, env):
     goal = size - 1
     trap = 0
 
-    # Table principale pour aligner les cases horizontalement
     main_line = Table(
         show_header=False, 
         box=None, 
@@ -54,7 +50,6 @@ def render_lineworld_rich(Q, env):
             c_left = get_q_color(q_vals[0], q_vals)
             c_right = get_q_color(q_vals[1], q_vals)
 
-            # Contenu de la cellule : Gauche en haut, Droite en bas
             cell_text = Text()
             cell_text.append(f"← {q_vals[0]:+.2f}\n", style=f"bold {c_left}")
             cell_text.append(f"s{s}\n", style="dim")

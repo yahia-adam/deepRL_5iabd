@@ -1,11 +1,21 @@
 import pygame
+import time
 import numpy as np
 from deeprl_5iabd.config import settings
-from deeprl_5iabd.envs.base_env import BaseEnv
+from deeprl_5iabd.envs.base_env import ModelFreeEnv
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 from deeprl_5iabd.helper import ImageButton
 
-class QuartoEnv(BaseEnv):
+class QuartoEnv(ModelFreeEnv):
+    """
+    Jeu de quarto 4x4.
+    Le joueur 0 commence toujours.
+    Actions space [0-15]: choisir une pièce, 16-31: placer pièce
+    Description space [0..132]: selected(4) + board(16*4) + available(16*4) 
+    Récompenses : -1.0 si le joueur 1 gagne, 0.0 si match nul, 1.0 si le joueur 0 gagne.
+    model free env donc on ne peut pas le tester avec q-learning.
+    """
+
     BOARD_SIZE    = 4
     NUM_PIECES    = 16
     NUM_ATTRS     = 4
@@ -33,6 +43,8 @@ class QuartoEnv(BaseEnv):
         [[0,1,0,1], [0,0,1,0], [0,0,1,1], [0,1,1,0]],
     ])
 
+    EMPTY_ACTION = [0] * NUM_PIECES
+
     def __init__(self):
         super().__init__("quarto")
         self.reset()
@@ -41,9 +53,9 @@ class QuartoEnv(BaseEnv):
     def reset(self) -> None:
         self.available = self.ALL_PIECES.copy()
         self.board = np.full((4, 4, 4), -1)
-        self.selected = np.full(4, -1)                 # pièce en cours de placement
-        self.selecting = True                          # True=choisir pièce, False=placer
-        self.player = 0                                # 0 = joueur 0, 1 = joueur 1
+        self.selected = np.full(4, -1)
+        self.selecting = True
+        self.player = 0
 
     def step(self, action: int) -> None:
         r, c = divmod(action if self.selecting else action - self.NUM_PIECES, self.BOARD_SIZE)
@@ -59,15 +71,12 @@ class QuartoEnv(BaseEnv):
         self.selecting = not self.selecting
 
     def get_action_space(self) -> list[int]:
-        """0-15: choisir pièce, 16-31: placer pièce"""
-        empty = [0] * self.NUM_PIECES
-
         if self.selecting:
             picks = [0 if self.available[r, c, 0] == -1 else 1 for r in range(4) for c in range(4)]
-            return  picks + empty
+            return  picks + self.EMPTY_ACTION
         else:
             picks = [1 if self.board[r, c, 0] == -1 else 0 for r in range(4) for c in range(4)]
-            return  empty + picks
+            return  self.EMPTY_ACTION + picks
 
     def get_observation_space(self) -> list[int]:
         return self.selected.tolist() + self.board.flatten().tolist() + self.available.flatten().tolist()
@@ -79,12 +88,12 @@ class QuartoEnv(BaseEnv):
                 return True
         return bool(np.all(self.available == -1))
 
-    def score(self) -> int:
+    def score(self) -> float:
         if not self.is_game_over():
-            return 0
+            return 0.0
         if np.all(self.available == -1):
-            return 0
-        return 1 if self.player == 0 else -1
+            return 0.0
+        return 1.0 if self.player == 0 else -1.0
 
 
     # Pygame rendering
@@ -96,7 +105,10 @@ class QuartoEnv(BaseEnv):
         self.screen.fill((0, 0, 0))
 
         font = pygame.font.SysFont(None, 36)
-        phase = "choisissez une pièce" if self.selecting else "placez la pièce"
+        if self.is_game_over():
+            phase = {0: "Match nul", 1: "Random a gagné", -1: "Vous avez gagné"}[self.score()]
+        else :
+            phase = "choisissez une pièce" if self.selecting else "placez la pièce"
         self.screen.blit(font.render(f"Joueur {self.player} — {phase}", True, (255, 255, 255)), (10, 10))
 
         for r in range(4):
@@ -155,6 +167,7 @@ class QuartoEnv(BaseEnv):
             running = not self.is_game_over()
 
         self.render()
+        time.sleep(10)
         print({0: "Match nul", 1: "Random a gagné", -1: "Vous avez gagné"}[self.score()])
 
 
@@ -175,6 +188,7 @@ class QuartoEnv(BaseEnv):
             running = not self.is_game_over()
 
         self.render()
+        time.sleep(10)
         print({0: "Match nul", 1: "Random a gagné", -1: "Vous avez gagné"}[self.score()])
 
     def _wait_for_human_click(self) -> int:

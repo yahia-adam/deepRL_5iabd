@@ -2,7 +2,7 @@ import pygame
 import numpy as np
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
-from deeprl_5iabd.envs.model_based_env import ModelBasedEnv
+from deeprl_5iabd.envs.base_env import ModelBasedEnv
 
 class LineWorld(ModelBasedEnv):
     """Environnement 1D : ligne de 5 positions (0-4).
@@ -10,6 +10,7 @@ class LineWorld(ModelBasedEnv):
     - Position 4 : récompense +1 (terminal)
     - Positions 1-3 : récompense 0
     - Actions : 0=gauche, 1=droite
+    model based env donc on doit créer p et on teste avec q-learning.
     """
 
     BOARD_SIZE = 5
@@ -28,14 +29,14 @@ class LineWorld(ModelBasedEnv):
         self.A = [0, 1]
         self.R = [-1, 0, 1]
 
-        self.p_matrix = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
-        self.p_matrix[1, 0, 0, 0] = 1 # S=1, A=gauche, S'=0, R=-1
-        self.p_matrix[2, 0, 1, 1] = 1 # S=2, A=gauche, S'=1, R=0
-        self.p_matrix[3, 0, 2, 1] = 1 # S=3, A=gauche, S'=2, R=0
+        self.p = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
+        self.p[1, 0, 0, 0] = 1 # S=1, A=gauche, S'=0, R=-1
+        self.p[2, 0, 1, 1] = 1 # S=2, A=gauche, S'=1, R=0
+        self.p[3, 0, 2, 1] = 1 # S=3, A=gauche, S'=2, R=0
 
-        self.p_matrix[1, 1, 2, 1] = 1 # S=1, A=droite, S'=2, R=0
-        self.p_matrix[2, 1, 3, 1] = 1 # S=2, A=droite, S'=3, R=0
-        self.p_matrix[3, 1, 4, 2] = 1 # S=3, A=droite, S'=4, R=1
+        self.p[1, 1, 2, 1] = 1 # S=1, A=droite, S'=2, R=0
+        self.p[2, 1, 3, 1] = 1 # S=2, A=droite, S'=3, R=0
+        self.p[3, 1, 4, 2] = 1 # S=3, A=droite, S'=4, R=1
 
         self._pygame_initialized = False
 
@@ -65,17 +66,17 @@ class LineWorld(ModelBasedEnv):
     def is_game_over(self):
         return  self.agent_pos in [0,4]
 
-    def score(self) -> int:
+    def score(self) -> float:
         if not (0 <= self.agent_pos < 5):
             raise ValueError(f"Error agent_pos {self.agent_pos}: agent hors de la grille")
 
         match self.agent_pos:
             case 0:
-                return -1
+                return self.R[0]
             case 4:
-                return 1
+                return self.R[2]
             case _:
-                return 0
+                return self.R[1]
 
     def get_observation_space(self) -> list[int]:
         return [self.agent_pos]
@@ -120,6 +121,10 @@ class LineWorld(ModelBasedEnv):
         self.pg_board   = [ImageButton(x = c * self.PG_PIECE_W + c * self.PG_GAP, y = 0,
                                         width = self.PG_PIECE_W, height = self.PG_PIECE_H)
                             for c in range(self.BOARD_SIZE)]
+        self.pg_board[0].score_text = str(self.R[0])
+        self.pg_board[0].score_color = (255, 0, 0)
+        self.pg_board[4].score_text = str(self.R[2])
+        self.pg_board[4].score_color = (0, 255, 0)
 
     def _play(self):
         self.reset()

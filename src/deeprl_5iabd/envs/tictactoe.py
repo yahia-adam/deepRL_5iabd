@@ -1,35 +1,45 @@
 import pygame
 import numpy as np
-from deeprl_5iabd.envs.model_based_env import ModelBasedEnv
+from deeprl_5iabd.envs.base_env import ModelBasedEnv
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 
 class TicTacToe(ModelBasedEnv):
+    """
+    Jeu de morpion 3x3.
+    Récompenses : -1.0 si le joueur 1 gagne, 0.0 si match nul, 1.0 si le joueur 0 gagne.
+    Le joueur 0 est représenté par des O et le joueur 1 par des X.
+    Le joueur 0 commence toujours.
+    Actions [0..8]: 0=haut-gauche, 1=haut-milieu, ....
+    model based env donc on doit créer p et on teste avec q-learning.
+    """
 
     BOARD_SIZE = 3
 
-    PG_PIECE_W = 250
-    PG_PIECE_H = 250
+    TEXT_H = 40
     PG_GAP = 5
 
-    TEXT_H = 40
-
+    PG_PIECE_W = 250
+    PG_PIECE_H = 250
     PG_WINDOW_W = (PG_PIECE_W + PG_GAP) * BOARD_SIZE
     PG_WINDOW_H = (PG_PIECE_H + PG_GAP) * BOARD_SIZE + TEXT_H
 
-    # Toutes les combinaisons gagnantes (lignes, colonnes, diagonales)
+    # Toutes les combinaisons gagnantes
     WIN_PATTERNS = [
-        [(0,0),(0,1),(0,2)],
-        [(1,0),(1,1),(1,2)],
-        [(2,0),(2,1),(2,2)],
+        # lignes
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
 
-        [(0,0),(1,0),(2,0)],
-        [(0,1),(1,1),(2,1)],
-        [(0,2),(1,2),(2,2)],
-
-        [(0,0),(1,1),(2,2)],
-        [(0,2),(1,1),(2,0)],
+        # colonnes
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8],
+        
+        # diagonales
+        [0, 4, 8],
+        [2, 4, 6],
     ]
 
     def __init__(self):
@@ -38,7 +48,7 @@ class TicTacToe(ModelBasedEnv):
         self.T = []
         self.A = [0, 1, 2, 3, 4, 5, 6, 7, 8]
         self.R = [-1.0, 0.0, 1.0]
-        self.p_matrix = self._create_p_matrix()
+        self._create_p()
         self._pygame_ready = False
 
     def num_states(self):
@@ -56,7 +66,7 @@ class TicTacToe(ModelBasedEnv):
         return int(np.dot(state_normalized, powers_of_3))
 
     def reset(self) -> None:
-        self.board = np.full((3, 3), -1)
+        self.board = np.array([-1]*9)
         self.player = 0
 
     def is_game_over(self) -> bool:
@@ -67,23 +77,22 @@ class TicTacToe(ModelBasedEnv):
         return False
 
     def get_observation_space(self) -> np.ndarray:
-        return self.board.flatten().tolist()
+        return self.board.tolist()
 
     def get_action_space(self):
-        return (self.board.flatten() == -1).astype(int)
+        return (self.board == -1).astype(int)
 
     def step(self, action: int) -> None:
-        r, c = divmod(action, 3)
-        self.board[r, c] = self.player
+        self.board[action] = self.player
         self.player = 0 if self.player == 1 else 1
 
-    def score(self) -> int:
+    def score(self) -> float:
         for pattern in self.WIN_PATTERNS:
-            cells = np.array([self.board[r, c] for r, c in pattern])
-            if -1 not in cells and np.all(cells == cells[0]):
-                return -1 if cells[0] == 1 else 1
+            a,b,c = pattern
+            if self.board[a] == self.board[b] == self.board[c] and self.board[a] != -1:
+                return self.R[0] if self.board[a] == 1 else self.R[2]
 
-        return 0
+        return self.R[1]
 
     def render(self) -> None:
         if not self._pygame_ready:
@@ -97,78 +106,56 @@ class TicTacToe(ModelBasedEnv):
 
         for r in range(3):
             for c in range(3):
-                if self.board[r, c] == 0:
+                if self.board[r * self.BOARD_SIZE + c] == 0:
                     self.pg_board[r][c].image = self.pg_assets[0]
-                elif self.board[r, c] == 1:
+                elif self.board[r * self.BOARD_SIZE + c] == 1:
                     self.pg_board[r][c].image = self.pg_assets[1]
                 self.pg_board[r][c].draw(self.screen)
 
         pygame.display.flip()
 
-    def _check_terminal(self, board_flat):
-        """
-        Analyse une grille plate pour déterminer si le jeu est fini.
-        Retourne (score, is_over)
-        """
-        # On replace en 3x3 pour utiliser WIN_PATTERNS
-        b = board_flat.reshape(3, 3)
-        for pattern in self.WIN_PATTERNS:
-            cells = [b[r, c] for r, c in pattern]
-            # Si toutes les cellules d'un pattern sont identiques et non vides
-            if -1 not in cells and all(x == cells[0] for x in cells):
-                # Joueur 0 gagne -> +1, Joueur 1 gagne -> -1
-                return (1 if cells[0] == 0 else -1), True
-        
-        # Match nul : plus de cases vides
-        if -1 not in board_flat:
-            return 0, True
-            
-        return 0, False
-
-    def _create_p_matrix(self):
-        """Initialise le dictionnaire des dynamiques."""
-        self.P = {} 
-        initial_state = np.full(9, -1)
-        # On lance l'exploration à partir d'une grille vide
+    def _create_p(self):
+        self.p = {}
+        initial_state = np.array([-1]*9)
         self._explore_from_state(initial_state)
-        return self.P
 
-    def _explore_from_state(self, board_flat):
+    def _explore_from_state(self, board):
         """Explore récursivement tous les états possibles sans saturer la RAM."""
-        s_id = self.state_id(board_flat)
-        
-        if s_id in self.P:
+        s_id = self.state_id(board)
+
+        if s_id in self.p:
             return
 
-        self.P[s_id] = {}
-        score, over = self._check_terminal(board_flat)
+        self.p[s_id] = {}
+        over = self.is_game_over()
 
         for a in range(9):
             # Si l'action est impossible (case prise) ou jeu déjà fini
-            if over or board_flat[a] != -1:
+            if over or board[a] != -1:
                 # On reste dans le même état (boucle terminale)
-                self.P[s_id][a] = [(1.0, s_id, 0.0, True)]
+                self.p[s_id][a] = [(1.0, s_id, 0.0, True)]
                 continue
 
             # --- Simulation du coup ---
-            next_board = board_flat.copy()
+            next_board = board.copy()
             # On compte les pions pour savoir qui doit jouer
             # (Pair = Joueur 0, Impair = Joueur 1)
-            nb_pions = np.sum(board_flat != -1)
+            nb_pions = np.sum(board != -1)
             current_player = 0 if nb_pions % 2 == 0 else 1
-            
+
             next_board[a] = current_player
-            
+
             # --- Calcul du résultat ---
             next_s_id = self.state_id(next_board)
-            reward, is_done = self._check_terminal(next_board)
-            
+            reward, is_done = self.score(), self.is_game_over()
+
             # Stockage : (probabilité, s_suivant, récompense, fini)
-            self.P[s_id][a] = [(1.0, next_s_id, float(reward), is_done)]
-            
+            self.p[s_id][a] = [(1.0, next_s_id, float(reward), is_done)]
+
             # Si le coup n'a pas terminé la partie, on explore la suite
             if not is_done:
                 self._explore_from_state(next_board)
+
     def _init_pygame(self) -> None:
         pygame.init()
 

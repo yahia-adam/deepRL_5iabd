@@ -17,7 +17,7 @@
 ## Jeu avec Joueur humain + GUI
 
 ```bash
-PYTHONPAH=. uv run python3 -m deeprl_5iabd.envs.line_world
+PYTHONPATH=. uv run python3 -m deeprl_5iabd.envs.line_world
 ```
 
 ![alt text](image.png)

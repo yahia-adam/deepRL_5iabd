@@ -1,11 +1,21 @@
 import pygame
 import numpy as np
-from deeprl_5iabd.envs.model_based_env import ModelBasedEnv
+from deeprl_5iabd.envs.base_env import ModelBasedEnv
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 
 class GridWorld(ModelBasedEnv):
+    """
+    Un agent se déplace sur une grille 5x5. 
+    Il part de (0,0) et doit atteindre (0,4).
+    (0,4) donne une récompense de 1.0.
+    (4,4) donne une récompense de -3.0.
+    Toutes les autres cases donnent une récompense de 0.0.
+    Actions : 0=bas, 1=haut, 2=droite, 3=gauche
+    model based env donc on doit créer p et on teste avec q-learning.
+    """
+
     BOARD_SIZE = 5
 
     PG_PIECE_W = 150
@@ -21,7 +31,7 @@ class GridWorld(ModelBasedEnv):
         self.T = [(0,4), (4,4)]
         self.A = [0, 1, 2, 3]     # 0=bas, 1=haut, 2=droite, 3=gauche
         self.R = [-3.0, 0.0, 1.0]
-        self.p_matrix = self._create_p_matrix()
+        self.p = self._create_p()
         self._pygame_initialized = False
 
     def num_states(self):
@@ -35,6 +45,51 @@ class GridWorld(ModelBasedEnv):
 
     def state_id(self, state) -> int:
         return state[0] * self.BOARD_SIZE + state[1]
+
+    def _create_p(self):
+        # 0=bas, 1=haut, 2=droite, 3=gauche
+        # 0=-3.0,  1=0.0,    2=1.0
+        # p[s, a, s_prime, r_idx]
+        p = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
+        terminal_ids = [self.state_id(t) for t in self.T]
+
+        down_border = [20, 21, 22, 23, 24]
+        up_border = [0, 1, 2, 3, 4]
+        left_border = [0, 5, 10, 15, 20]
+        right_border = [4, 9, 14, 19, 24]
+
+        for s in range(self.num_states()):
+            if s in terminal_ids:
+                continue
+
+            for a in range(self.num_actions()):
+                is_collision = False
+                next_s = s
+
+                if a == 0:
+                    is_collision = s in down_border
+                    next_s = s + 5
+                elif a == 1:
+                    is_collision = s in up_border
+                    next_s = s - 5
+                elif a == 2:
+                    is_collision = s in right_border
+                    next_s = s + 1
+                elif a == 3:
+                    is_collision = s in left_border
+                    next_s = s - 1
+
+                # la récompense
+                if is_collision:
+                    p[s, a, s, 1] = 1.0
+                else:
+                    r_idx = 1 # 0 par défaut
+                    if next_s == 4: r_idx = 2  # 1
+                    elif next_s == 24: r_idx = 0 # -3
+
+                    p[s, a, next_s, r_idx] = 1.0
+
+        return p
 
     def available_actions(self) -> np.ndarray:
         if self.is_game_over():
@@ -81,7 +136,7 @@ class GridWorld(ModelBasedEnv):
             self.agent_pos = (self.agent_pos[0], self.agent_pos[1] - 1)
         self.board[self.agent_pos] = 1
 
-    def score(self) -> int:
+    def score(self) -> float:
         if self.agent_pos == (4, 4):
             return self.R[0]
         elif self.agent_pos == (0, 4):
@@ -103,51 +158,6 @@ class GridWorld(ModelBasedEnv):
                     self.pg_board[r][c].image = None
                 self.pg_board[r][c].draw(self.screen)
         pygame.display.flip()
-
-    def _create_p_matrix(self):
-        # 0=bas, 1=haut, 2=droite, 3=gauche
-        # 0=-3.0,  1=0.0,    2=1.0
-        # p[s, a, s_prime, r_idx]
-        p = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
-        terminal_ids = [self.state_id(t) for t in self.T]
-
-        down_border = [20, 21, 22, 23, 24]
-        up_border = [0, 1, 2, 3, 4]
-        left_border = [0, 5, 10, 15, 20]
-        right_border = [4, 9, 14, 19, 24]
-
-        for s in range(self.num_states()):
-            if s in terminal_ids:
-                continue
-
-            for a in range(self.num_actions()):
-                is_collision = False
-                next_s = s
-
-                if a == 0:
-                    is_collision = s in down_border
-                    next_s = s + 5
-                elif a == 1:
-                    is_collision = s in up_border
-                    next_s = s - 5
-                elif a == 2:
-                    is_collision = s in right_border
-                    next_s = s + 1
-                elif a == 3:
-                    is_collision = s in left_border
-                    next_s = s - 1
-
-                # la récompense
-                if is_collision:
-                    p[s, a, s, 1] = 1.0
-                else:
-                    r_idx = 1 # 0 par défaut
-                    if next_s == 4: r_idx = 2  # 1 (Goal)
-                    elif next_s == 24: r_idx = 0 # -3 (Trap)
-
-                    p[s, a, next_s, r_idx] = 1.0
-
-        return p
 
     def _init_pygame(self) -> None:
         pygame.init()
@@ -176,6 +186,11 @@ class GridWorld(ModelBasedEnv):
             ]
             for r in range(self.BOARD_SIZE)
         ]
+
+        self.pg_board[0][4].score_text = str(self.R[2])
+        self.pg_board[0][4].score_color = (0, 255, 0)
+        self.pg_board[4][4].score_text = str(self.R[0])
+        self.pg_board[4][4].score_color = (255, 0, 0)
 
   # Game modes
     def _play(self):

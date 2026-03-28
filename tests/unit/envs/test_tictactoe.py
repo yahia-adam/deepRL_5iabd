@@ -57,7 +57,7 @@ class TestTicTacToeStep:
     def test_step_place_puts_piece_on_board(self, env):
         """Placer une pièce doit la mettre sur le plateau."""
         env.step(0)
-        assert np.all(env.board[0, 0] != -1)
+        assert env.board[0] != -1
 
 class TestTicTacToeObservationSpace:
     def test_observation_space_length(self, env):

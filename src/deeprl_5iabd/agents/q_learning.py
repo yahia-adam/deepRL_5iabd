@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.distributions import Categorical
 from deeprl_5iabd.agents.random_agent import RandomPlayer
-from deeprl_5iabd.envs.model_based_env import ModelBasedEnv
+from deeprl_5iabd.envs.base_env import ModelBasedEnv
 from deeprl_5iabd.helper import softmax_with_mask
 
 def choose_action_epsilon_greedy(state, mask, Q, epsilon):

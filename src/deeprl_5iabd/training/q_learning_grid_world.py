@@ -27,15 +27,14 @@ def render_gridworld_rich(Q, env):
     size = 5
     goal = (0, 4)
     trap = (4, 4)
-    # Mapping des actions : 0: Bas, 1: Haut, 2: Droite, 3: Gauche
     arrows = {0: "▼", 1: "▲", 2: "▶", 3: "◀"}
-    
+
     main_grid = Table(
         show_header=False, 
         box=None, 
         padding=0, 
         collapse_padding=True,
-        title="\n[bold]🗺️ GRIDWORLD : Politique & Valeurs Q[/bold]\n"
+        title="\n[bold] GRIDWORLD : Politique & Valeurs Q[/bold]\n"
     )
     
     for _ in range(size):
@@ -59,18 +58,14 @@ def render_gridworld_rich(Q, env):
                 mini_table.add_column(width=7, justify="center")
                 mini_table.add_column(width=7, justify="center")
 
-                # Couleurs
                 colors = [get_q_color(v, q_vals) for v in q_vals]
 
-                # Ligne Haut
                 mini_table.add_row("", Text(f"{q_vals[1]:.2f}", style=f"bold {colors[1]}"), "")
-                # Ligne Milieu (Gauche | ACTION DOMINANTE | Droite)
                 mini_table.add_row(
                     Text(f"{q_vals[3]:.2f}", style=f"bold {colors[3]}"), 
                     Text(arrows[best_action], style="bold yellow underline"), 
                     Text(f"{q_vals[2]:.2f}", style=f"bold {colors[2]}")
                 )
-                # Ligne Bas
                 mini_table.add_row("", Text(f"{q_vals[0]:.2f}", style=f"bold {colors[0]}"), "")
                 
                 cell_content = Panel(mini_table, border_style="bright_black", height=7)

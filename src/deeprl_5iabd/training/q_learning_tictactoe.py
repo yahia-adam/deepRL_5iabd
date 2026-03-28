@@ -11,7 +11,6 @@ from deeprl_5iabd.agents.q_learning import q_learning
 console = Console()
 
 def render_q_analysis(Q, env, board_flat, title="Analyse d'état"):
-    """Affiche une grille 3x3 : Joueur 0 = ⭕ (Agent), Joueur 1 = ❌ (Random)."""
     s_id = env.state_id(board_flat)
     q_values = Q[s_id]
     
@@ -27,16 +26,12 @@ def render_q_analysis(Q, env, board_flat, title="Analyse d'état"):
             q_val = q_values[idx]
 
             if val == 0:
-                # Joueur 0 est maintenant le O (Cercle)
                 content = Text("\n⭕\n(Agent - P0)", style="bold green", justify="center")
                 style = "green"
             elif val == 1:
-                # Joueur 1 est maintenant le X (Croix)
                 content = Text("\n❌\n(Random - P1)", style="bold red", justify="center")
                 style = "red"
             else:
-                # Case vide : on affiche la valeur Q
-                # On met en vert la case que l'IA préfère
                 is_best = (q_val == max(q_values[board_flat == -1])) if any(board_flat == -1) else False
                 color = "bright_green" if is_best else "white"
                 content = Text(f"\nQ: {q_val:.3f}\n(Vide)", style=f"bold {color}", justify="center")
@@ -49,9 +44,9 @@ def render_q_analysis(Q, env, board_flat, title="Analyse d'état"):
 if __name__ == "__main__":
     env = TicTacToe()
     
-    console.print("[bold yellow]🚀 Entraînement du Q-Learning (Agent ⭕ contre Random ❌)...[/bold yellow]")
+    console.print("[bold yellow] Entraînement du Q-Learning (Agent ⭕ contre Random ❌)...[/bold yellow]")
     Q = q_learning(env=env, num_episodes=100_000, epsilon=0.1, learning_rate=0.1, is_two_players=True)
-    console.print("[bold green]✅ Entraînement terminé ![/bold green]")
+    console.print("[bold green] Entraînement terminé ![/bold green]")
 
     tests = [
         (np.array([1, -1, 1, 0, 0, -1, -1, -1, -1]), "Finir ligne milieu"),

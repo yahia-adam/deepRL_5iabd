@@ -14,7 +14,6 @@ def line_env():
 
 @pytest.fixture
 def reinforce_agent():
-    # LineWorld : obs = [pos] (1 val), actions = [left, right] (2 actions)
     return PolicyNetwork(
         name="reinforce_lw",
         input_size=1,
@@ -25,7 +24,6 @@ def reinforce_agent():
 
 @pytest.fixture
 def opponent():
-    # Pas d'adversaire dans LineWorld, mais reinforce() en attend un
     return RandomPlayer(action_dim=2)
 
 
@@ -54,7 +52,6 @@ class TestReinforceLineWorld:
 
     def test_agent_parameters_updated(self, line_env, opponent, reinforce_agent):
         """Les paramètres du réseau doivent avoir été modifiés après entraînement."""
-        # Capturer les poids initiaux
         initial_weights = [p.clone() for p in reinforce_agent.parameters()]
 
         reinforce(
@@ -65,7 +62,6 @@ class TestReinforceLineWorld:
             num_episodes=20,
         )
 
-        # Au moins un paramètre doit avoir changé
         weights_changed = any(
             not torch.equal(p, w)
             for p, w in zip(reinforce_agent.parameters(), initial_weights)
@@ -81,7 +77,6 @@ class TestReinforceLineWorld:
             logger=None,
             num_episodes=5,
         )
-        # Après l'entraînement, on peut réinitialiser et jouer normalement
         line_env.reset()
         assert not line_env.is_game_over()
         assert line_env.get_observation_space() == [2]

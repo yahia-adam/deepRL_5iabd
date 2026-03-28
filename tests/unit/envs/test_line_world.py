@@ -30,15 +30,15 @@ class TestLineWorldModelBasedEnvMethods:
         assert env.A == [0, 1]
         assert env.R == [-1, 0, 1]
         assert env.T == [[0], [4]]
-        assert env.p_matrix.shape == (5, 2, 5, 3)
+        assert env.p.shape == (5, 2, 5, 3)
 
-    def test_p_matrix(self, env):
-        assert env.p_matrix[1, 0, 0, 0] == 1
-        assert env.p_matrix[2, 0, 1, 1] == 1
-        assert env.p_matrix[3, 0, 2, 1] == 1
-        assert env.p_matrix[1, 1, 2, 1] == 1
-        assert env.p_matrix[2, 1, 3, 1] == 1
-        assert env.p_matrix[3, 1, 4, 2] == 1
+    def test_p(self, env):
+        assert env.p[1, 0, 0, 0] == 1
+        assert env.p[2, 0, 1, 1] == 1
+        assert env.p[3, 0, 2, 1] == 1
+        assert env.p[1, 1, 2, 1] == 1
+        assert env.p[2, 1, 3, 1] == 1
+        assert env.p[3, 1, 4, 2] == 1
 
     def test_state_id(self, env):
         assert env.state_id([0]) == 0

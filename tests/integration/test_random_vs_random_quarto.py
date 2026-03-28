@@ -24,7 +24,7 @@ def player1():
 def play_full_game(env: QuartoEnv, player0: RandomPlayer, player1: RandomPlayer) -> int:
     """Joue une partie complète et retourne le score final."""
     env.reset()
-    max_steps = 200  # garde-fou
+    max_steps = 200
 
     for _ in range(max_steps):
         if env.is_game_over():
@@ -72,8 +72,6 @@ class TestRandomVsRandomQuarto:
 
     def test_draw_has_no_available_pieces(self, env, player0, player1):
         """En cas de match nul, toutes les pièces doivent être épuisées (available vide)."""
-        # QuartoEnv.is_game_over() retourne True quand available[:,:,0] == -1 (toutes utilisées)
-        # score() retourne 0 dans ce cas → match nul
         max_attempts = 30
         draws_found = 0
         for _ in range(max_attempts):
@@ -81,7 +79,6 @@ class TestRandomVsRandomQuarto:
             play_full_game(env, player0, player1)
             if env.score() == 0:
                 draws_found += 1
-                # La condition de match nul dans QuartoEnv est available[:,:,0] == -1
                 assert np.all(env.available[:, :, 0] == -1), \
                     "Match nul mais des pièces sont encore disponibles"
         if draws_found == 0:
