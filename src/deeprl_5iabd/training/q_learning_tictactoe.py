@@ -4,7 +4,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
-
 from deeprl_5iabd.envs.tictactoe import TicTacToe
 from deeprl_5iabd.agents.q_learning import q_learning
 

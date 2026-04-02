@@ -1,6 +1,6 @@
 import pygame
 import numpy as np
-from deeprl_5iabd.envs.base_env import ModelBasedEnv
+from deeprl_5iabd.envs.base_env import ModelBasedEnv, BaseEnv
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
 from deeprl_5iabd.agents.random_agent import RandomPlayer
@@ -45,6 +45,12 @@ class GridWorld(ModelBasedEnv):
 
     def state_id(self, state) -> int:
         return state[0] * self.BOARD_SIZE + state[1]
+
+    def determinize(self) -> BaseEnv:
+        new_env = GridWorld()
+        new_env.agent_pos = self.agent_pos
+        new_env.board = self.board.copy()
+        return new_env        
 
     def _create_p(self):
         # 0=bas, 1=haut, 2=droite, 3=gauche
@@ -192,7 +198,6 @@ class GridWorld(ModelBasedEnv):
         self.pg_board[4][4].score_text = str(self.R[0])
         self.pg_board[4][4].score_color = (255, 0, 0)
 
-  # Game modes
     def _play(self):
         self.reset()
         while not self.is_game_over():

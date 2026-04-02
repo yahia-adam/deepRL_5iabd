@@ -15,19 +15,15 @@ class BaseEnv(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def is_game_over(self) -> bool:
+    def get_action_mask(self) -> list[int]:
         raise NotImplementedError
 
     @abstractmethod
-    def score(self) -> float:
+    def get_observation_mask(self) -> list[int]:
         raise NotImplementedError
 
     @abstractmethod
-    def get_action_space(self) -> list[int]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_observation_space(self) -> list[int]:
+    def determinize(self) -> 'BaseEnv':
         raise NotImplementedError
 
 class ModelBasedEnv(BaseEnv, ABC):

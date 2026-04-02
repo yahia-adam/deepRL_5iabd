@@ -30,7 +30,6 @@ def get_default_device() -> str:
     return "cpu"
 
 def softmax_with_mask(S, M):
-    M = torch.tensor(M, dtype=S.dtype, device=S.device)
     positive_or_null_s = S - S.min()
     masked_positive_or_null_s = positive_or_null_s * M
     negative_or_null_s = masked_positive_or_null_s - masked_positive_or_null_s.max()

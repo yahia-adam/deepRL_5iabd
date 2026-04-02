@@ -23,8 +23,8 @@ def train_self_play_loop(iterations=10, num_episodes=5_000, early_stop_val=0.65)
         gen_name = f"Gen_{i}"
         experiment_name = f"Quarto_SelfPlay_{gen_name}_vs_{opponent.name}"
         
-        print(f"\n--- Entraînement {gen_name} ---")
-        print(f"\n--- {gen_name}_vs_{opponent.name} ---")
+        print(f"\n Entraînement {gen_name} ")
+        print(f"\n {gen_name}_vs_{opponent.name} ")
 
         logger = TensorBoardLogger(
             log_dir=settings.training_logs_path, 

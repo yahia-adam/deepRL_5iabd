@@ -16,12 +16,12 @@ def choose_action_epsilon_greedy(state, mask, Q, epsilon):
         return int(torch.argmax(probs).item())
 
 def q_learning(
-    env,
-    learning_rate=0.1,
-    epsilon=0.1,
-    gamma=0.9,
-    num_episodes=100_000,
-    is_two_players=False
+    env: ModelBasedEnv,
+    learning_rate: float = 0.1,
+    epsilon: float = 0.1,
+    gamma: float = 0.9,
+    num_episodes: int = 100_000,
+    is_two_players: bool = False
 ):
     Q = np.zeros((env.num_states(), env.num_actions()))
     rp = RandomPlayer(action_dim=env.num_actions()) if is_two_players else None
@@ -33,7 +33,7 @@ def q_learning(
         while not env.is_game_over():
             mask = env.get_action_space()
             a = choose_action_epsilon_greedy(s, mask, Q, epsilon)
-            
+
             old_score = env.score()
             env.step(a)
 
@@ -45,7 +45,7 @@ def q_learning(
                 env.step(a_adv)
 
             s_prime = env.state_id(env.get_observation_space())
-            r = float(env.score()) if is_two_players else float(env.score() - old_score)
+            r = env.score() if is_two_players else (env.score() - old_score)
 
             if not env.is_game_over():
                 mask_prime = env.get_action_space()

@@ -10,16 +10,18 @@ from deeprl_5iabd.agents.policy_net import PolicyNetwork
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 from deeprl_5iabd.tracking.tb_logger import TensorBoardLogger
 from torch.distributions import Categorical
+import torch
 
 def count_n_match_time(env: BaseEnv, num_episode):
-    player = RandomPlayer(action_dim=len(env.get_action_space()))
+    player = RandomPlayer(action_dim=len(env.get_action_mask()))
     s = perf_counter()
-    
+
     i = 0
-    while (i <= num_episode):
-        while (not env.is_game_over()):
-            action_spaces = env.get_action_space()
-            probs = player.forward(x=None, mask=action_spaces)
+    while (i < num_episode):
+        env.reset()
+        while (not env.is_game_over):
+            aa_mask = env.get_action_mask()
+            probs = player.forward(x=None, mask=aa_mask)
             probs_dist = Categorical(probs)
             action_pos = probs_dist.sample()
             env.step(action_pos.item())
@@ -32,8 +34,8 @@ def count_n_match_time(env: BaseEnv, num_episode):
 
 if __name__ == "__main__":
 
-    envs = [LineWorld(), GridWorld(), TicTacToe(), QuartoEnv()]
-    total_match = 1_000_000
+    envs = [QuartoEnv()]
+    total_match = 2_000
 
     print(f"\n\nTEST SUR {total_match} PARTIES ...")
     print("-" * 44)

@@ -2,7 +2,7 @@ import pygame
 import numpy as np
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
-from deeprl_5iabd.envs.base_env import ModelBasedEnv
+from deeprl_5iabd.envs.base_env import ModelBasedEnv, BaseEnv
 
 class LineWorld(ModelBasedEnv):
     """Environnement 1D : ligne de 5 positions (0-4).
@@ -10,7 +10,6 @@ class LineWorld(ModelBasedEnv):
     - Position 4 : récompense +1 (terminal)
     - Positions 1-3 : récompense 0
     - Actions : 0=gauche, 1=droite
-    model based env donc on doit créer p et on teste avec q-learning.
     """
 
     BOARD_SIZE = 5
@@ -51,6 +50,11 @@ class LineWorld(ModelBasedEnv):
 
     def state_id(self, state) -> int:
         return state[0]
+
+    def determinize(self) -> BaseEnv:
+        new_env = LineWorld()
+        new_env.agent_pos = self.agent_pos
+        return new_env
 
     def reset(self):
         self.agent_pos = 2

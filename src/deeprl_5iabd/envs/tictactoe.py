@@ -12,7 +12,6 @@ class TicTacToe(ModelBasedEnv):
     Le joueur 0 est représenté par des O et le joueur 1 par des X.
     Le joueur 0 commence toujours.
     Actions [0..8]: 0=haut-gauche, 1=haut-milieu, ....
-    model based env donc on doit créer p et on teste avec q-learning.
     """
 
     BOARD_SIZE = 3
@@ -36,7 +35,7 @@ class TicTacToe(ModelBasedEnv):
         [0, 3, 6],
         [1, 4, 7],
         [2, 5, 8],
-        
+
         # diagonales
         [0, 4, 8],
         [2, 4, 6],
@@ -45,7 +44,6 @@ class TicTacToe(ModelBasedEnv):
     def __init__(self):
         super().__init__("TicTacToe")
         self.reset()
-        self.T = []
         self.A = [0, 1, 2, 3, 4, 5, 6, 7, 8]
         self.R = [-1.0, 0.0, 1.0]
         self._create_p()
@@ -64,6 +62,12 @@ class TicTacToe(ModelBasedEnv):
         state_normalized = np.array(state) + 1
         powers_of_3 = 3 ** np.arange(9)
         return int(np.dot(state_normalized, powers_of_3))
+
+    def determinize(self):
+        new_env = TicTacToe()
+        new_env.board = self.board.copy()
+        new_env.player = self.player
+        return new_env
 
     def reset(self) -> None:
         self.board = np.array([-1]*9)
@@ -116,45 +120,42 @@ class TicTacToe(ModelBasedEnv):
 
     def _create_p(self):
         self.p = {}
-        initial_state = np.array([-1]*9)
-        self._explore_from_state(initial_state)
+        self._explore_from_state()
 
-    def _explore_from_state(self, board):
-        """Explore récursivement tous les états possibles sans saturer la RAM."""
-        s_id = self.state_id(board)
+    def _explore_from_state(self):
+        pass
+        # s_id = self.state_id(self.board)
+        # if s_id in self.p:
+        #     return
 
-        if s_id in self.p:
-            return
+        # self.p[s_id] = {}
+        # over = self.is_game_over()
+        # mask = self.get_action_space()
 
-        self.p[s_id] = {}
-        over = self.is_game_over()
+        # for a in range(9):
+        #     if over or mask[a] == 0:
+        #         # On définit l'issue d'une action impossible ou finie
+        #         self.p[s_id][a] = [(1.0, s_id, 0.0, True)]
+        #     else:
+        #         # 1. Sauvegarde l'état du joueur avant le coup
+        #         prev_player = self.player
 
-        for a in range(9):
-            # Si l'action est impossible (case prise) ou jeu déjà fini
-            if over or board[a] != -1:
-                # On reste dans le même état (boucle terminale)
-                self.p[s_id][a] = [(1.0, s_id, 0.0, True)]
-                continue
+        #         # 2. Joue le coup (modifie self.board et self.player)
+        #         self.step(a)
 
-            # --- Simulation du coup ---
-            next_board = board.copy()
-            # On compte les pions pour savoir qui doit jouer
-            # (Pair = Joueur 0, Impair = Joueur 1)
-            nb_pions = np.sum(board != -1)
-            current_player = 0 if nb_pions % 2 == 0 else 1
+        #         # 3. Enregistre les résultats
+        #         next_s_id = self.state_id(self.board)
+        #         res_reward = self.score()
+        #         res_done = self.is_game_over()
+        #         self.p[s_id][a] = [(1.0, next_s_id, res_reward, res_done)]
 
-            next_board[a] = current_player
+        #         # 4. Explore la suite si ce n'est pas fini
+        #         if not res_done:
+        #             self._explore_from_state()
 
-            # --- Calcul du résultat ---
-            next_s_id = self.state_id(next_board)
-            reward, is_done = self.score(), self.is_game_over()
-
-            # Stockage : (probabilité, s_suivant, récompense, fini)
-            self.p[s_id][a] = [(1.0, next_s_id, float(reward), is_done)]
-
-            # Si le coup n'a pas terminé la partie, on explore la suite
-            if not is_done:
-                self._explore_from_state(next_board)
+        #         # 5. BACKTRACK : On remet le plateau ET le joueur à l'état initial
+        #         self.board[a] = -1
+        #         self.player = prev_player
 
     def _init_pygame(self) -> None:
         pygame.init()
@@ -193,8 +194,7 @@ class TicTacToe(ModelBasedEnv):
             for r in range(3)
         ]
 
-  # Game modes
-    def play_vs_random(self):
+    def humain_vs_random(self):
         agent   = RandomPlayer(action_dim=len(self.get_action_space()))
         running = True
         self.render()
@@ -225,4 +225,4 @@ class TicTacToe(ModelBasedEnv):
 
 if __name__ == "__main__":
     env = TicTacToe()
-    env.play_vs_random()
+    env.humain_vs_random()
