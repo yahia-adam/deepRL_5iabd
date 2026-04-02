@@ -55,6 +55,7 @@ class QuartoEnv(BaseEnv):
         self.selecting = True
         self.is_game_over = False
         self.score = 0.0
+        self._pieces_left = 16
         self.agent_player = random.choice([0, 1])
         self.current_player = 0
 
@@ -81,6 +82,7 @@ class QuartoEnv(BaseEnv):
             action *= 4
             self.board[action:action+4] = self.selected
             self.selected = self.selected.fill_(-1)
+            self._pieces_left -= 1
 
             # update game over and score
             self.is_game_over = False
@@ -100,30 +102,20 @@ class QuartoEnv(BaseEnv):
                         break
 
             # is draw
-            if torch.all(self.available_ps == -1):
+            if self._pieces_left == 0:
                 self.is_game_over = True
                 self.score = 0.0
 
         self.selecting = not self.selecting
 
     def get_action_mask(self) -> torch.Tensor:
-        # [board, available_ps]
         if self.selecting:
-            self._action_mask_buffer[:16] = 0
-            for i in range(16):
-                if (self.available_ps[i*4] == -1):
-                    self._action_mask_buffer[16 + i] = 0
-                else:
-                    self._action_mask_buffer[16 + i] = 1
-            return  self._action_mask_buffer
+            self._action_mask_buffer[:16].zero_()
+            self._action_mask_buffer[16:] = (self.available_ps[0::4] != -1).float()
         else:
-            self._action_mask_buffer[-16:] = 0
-            for i in range(16):
-                if (self.board[i*4] == -1):
-                    self._action_mask_buffer[i] = 1
-                else:
-                    self._action_mask_buffer[i] = 0
-            return  self._action_mask_buffer
+            self._action_mask_buffer[16:].zero_()
+            self._action_mask_buffer[:16] = (self.board[0::4] == -1).float()
+        return self._action_mask_buffer
 
     def get_observation_mask(self) -> torch.Tensor:
         self._obs_mask_buffer[0:4] = self.selected
@@ -141,7 +133,6 @@ class QuartoEnv(BaseEnv):
 
         self.screen.fill((0, 0, 0))
 
-
         for i in range(16):
             r,c = divmod(i, 4)
             self.pg_board[r][c].image = _asset(self.board[i*4:i*4+4])
@@ -158,7 +149,7 @@ class QuartoEnv(BaseEnv):
         else:
             font = pygame.font.SysFont(None, 36)
             text = "choisissez une pièce" if self.selecting else "placez la pièce"
-            self.screen.blit(font.render(f"Joueur {self.agent_player} — {text}", True, (255, 255, 255)), (10, 10))
+            self.screen.blit(font.render(f"Joueur {self.current_player} — {text}", True, (255, 255, 255)), (10, 10))
 
         pygame.display.flip()
 
@@ -225,7 +216,7 @@ class QuartoEnv(BaseEnv):
                             return r * 4 + c + offset
 
 def main():
-    QuartoEnv().humain_vs_random()
+    QuartoEnv().humain_vs_humain()
 
 if __name__ == "__main__":
     main()

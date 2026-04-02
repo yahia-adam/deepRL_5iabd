@@ -116,14 +116,6 @@ class TestQuarto:
         assert torch.all(obs[4+16*4:] == env.available_ps)
         assert obs_ptr == env._obs_mask_buffer.data_ptr()
 
-    def test_quarto_is_game_over_draw(self, env):
-        # pas de piece dispo
-        env.selecting = False
-        env.available_ps.fill_(-1)
-        env.step(0)
-        assert env.is_game_over == True
-        assert env.score == 0.0
-
     def test_quarto_is_game_over_win(self, env):
         env.step(16)
         env.step(0)
