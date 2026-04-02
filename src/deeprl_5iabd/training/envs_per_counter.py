@@ -1,16 +1,11 @@
 from time import perf_counter
-from deeprl_5iabd.config import settings
 from deeprl_5iabd.envs.line_world import LineWorld
 from deeprl_5iabd.envs.grid_world import GridWorld
 from deeprl_5iabd.envs.tictactoe import TicTacToe
 from deeprl_5iabd.envs.quarto import QuartoEnv
 from deeprl_5iabd.envs.base_env import BaseEnv
-from deeprl_5iabd.agents.reinforce import reinforce
-from deeprl_5iabd.agents.policy_net import PolicyNetwork
 from deeprl_5iabd.agents.random_agent import RandomPlayer
-from deeprl_5iabd.tracking.tb_logger import TensorBoardLogger
 from torch.distributions import Categorical
-import torch
 
 def count_n_match_time(env: BaseEnv, num_episode):
     player = RandomPlayer(action_dim=len(env.get_action_mask()))

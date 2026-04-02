@@ -1,9 +1,13 @@
 import os
+import torch
 from pathlib import Path
-from typing import ClassVar
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from deeprl_5iabd.helper import get_default_device
+
+def get_default_device() -> str:
+    if hasattr(torch, "accelerator") and torch.accelerator.is_available():
+        return torch.accelerator.current_accelerator().type
+    return "cpu"
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

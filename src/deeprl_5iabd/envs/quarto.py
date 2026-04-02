@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import random
 from deeprl_5iabd.config import settings
-from deeprl_5iabd.envs.base_env import ModelFreeEnv, BaseEnv
+from deeprl_5iabd.envs.base_env import BaseEnv
 from deeprl_5iabd.agents.random_agent import RandomPlayer
 from deeprl_5iabd.helper import ImageButton
 
@@ -36,15 +36,15 @@ class QuartoEnv(BaseEnv):
         1, 1, 0, 1,  1, 0, 1, 0,  1, 0, 1, 1,  1, 1, 1, 0,
         0, 1, 1, 1,  0, 0, 0, 0,  0, 0, 0, 1,  0, 1, 0, 0,
         0, 1, 0, 1,  0, 0, 1, 0,  0, 0, 1, 1,  0, 1, 1, 0,
-    ])
+    ], device=settings.device)
 
     def __init__(self):
         super().__init__("quarto")
-        self.selected = torch.full((4,), -1)
-        self.board = torch.full((16 * 4,), -1)
-        self.available_ps = torch.full((16 * 4,), -1)
-        self._action_mask_buffer = torch.zeros((16 + 16))
-        self._obs_mask_buffer = torch.zeros(4 + 16 * 4 + 16 * 4)
+        self.selected = torch.full((4,), -1, device=settings.device)
+        self.board = torch.full((16 * 4,), -1,  device=settings.device)
+        self.available_ps = torch.full((16 * 4,), -1, device=settings.device)
+        self._action_mask_buffer = torch.zeros((16 + 16),  device=settings.device)
+        self._obs_mask_buffer = torch.zeros(4 + 16 * 4 + 16 * 4,  device=settings.device)
         self._pygame_ready = False
         self.reset()
 
@@ -84,10 +84,6 @@ class QuartoEnv(BaseEnv):
             self.selected = self.selected.fill_(-1)
             self._pieces_left -= 1
 
-            # update game over and score
-            self.is_game_over = False
-            self.score = 0.0
-
             # is game over
             for (a, b, c, d) in self.VICTORY_PATTERNS:
                 if (self.board[a*4] == -1 ):
@@ -101,7 +97,6 @@ class QuartoEnv(BaseEnv):
                             self.score = -1.0
                         break
 
-            # is draw
             if self._pieces_left == 0:
                 self.is_game_over = True
                 self.score = 0.0

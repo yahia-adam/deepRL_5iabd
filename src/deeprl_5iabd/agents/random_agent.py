@@ -1,6 +1,7 @@
 import torch
 from deeprl_5iabd.agents.base_agent import BaseAgent
 from deeprl_5iabd.helper import softmax_with_mask
+from deeprl_5iabd.config import settings
 
 class RandomPlayer(BaseAgent):
     def __init__(self, action_dim):
@@ -8,7 +9,7 @@ class RandomPlayer(BaseAgent):
         self.action_dim = action_dim
 
     def forward(self, x, mask):
-        logits = torch.randn(self.action_dim)
+        logits = torch.randn(self.action_dim, device=settings.device)
         return softmax_with_mask(logits, mask)
 
     def save(self, filename):

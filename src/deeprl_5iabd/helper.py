@@ -1,7 +1,6 @@
 import torch
 import pygame
-import torch.nn.functional as F
-import numpy as np
+from deeprl_5iabd.config import settings
 
 class ImageButton:
     def __init__(self, x, y, width, height):
@@ -23,11 +22,6 @@ class ImageButton:
 
     def is_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos)
-
-def get_default_device() -> str:
-    if hasattr(torch, "accelerator") and torch.accelerator.is_available():
-        return torch.accelerator.current_accelerator().type
-    return "cpu"
 
 def softmax_with_mask(S, M):
     positive_or_null_s = S - S.min()
