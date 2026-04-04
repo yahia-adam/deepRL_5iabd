@@ -8,6 +8,7 @@ dependencies = [
     "icecream>=2.1.10",
     "ipython>=9.10.0",
     "numpy>=2.4.2",
+    "pybind11>=3.0.3",
     "pydantic-settings>=2.13.1",
     "pygame>=2.6.1",
     "rich>=14.3.3",

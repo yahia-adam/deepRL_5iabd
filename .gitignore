@@ -5,6 +5,7 @@ __pycache__/
 *$py.class
 experimentation_logs/models/
 experimentation_logs/train_logs/
+quarto_cpp.so
 
 # C extensions
 *.so
