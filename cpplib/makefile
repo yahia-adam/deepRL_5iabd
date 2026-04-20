@@ -4,7 +4,7 @@ CXXFLAGS := -O3 -Wall -Wextra -shared -std=c++17 -fPIC $(shell python3 -m pybind
 EXT      := $(shell python3-config --extension-suffix)
 TARGET   := ../quarto_cpp.so
 
-SRCS     := main.cpp
+SRCS     := quarto_env.cpp
 
 .PHONY: all clean
 

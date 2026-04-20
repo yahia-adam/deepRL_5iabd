@@ -1,122 +1,184 @@
+import os
 import pygame
-import torch
-import random
 import numpy as np
-import quarto_cpp
-
-from deeprl_5iabd.config import settings
-from deeprl_5iabd.envs.base_env import BaseEnv
-from deeprl_5iabd.agents.random_agent import RandomPlayer
+import random
+import gymnasium as gym
+from gymnasium import spaces
 from deeprl_5iabd.helper import ImageButton
+from deeprl_5iabd.config import settings
+from enum import IntEnum
+from deeprl_5iabd.helper import Player
 
-class QuartoEnv(BaseEnv):
+class Phase(IntEnum):
+    SELECT = 0 
+    PLACE  = 1
+
+class QuartoEnv(gym.Env):
+    BOARD_SIZE    = 4
+    NUM_PIECES    = 16
+    NUM_ATTRS     = 4
+
     PG_PIECE_W    = 120
     PG_PIECE_H    = 168
     PG_GAP        = 4
-    PG_WINDOW_W   = (PG_PIECE_W + PG_GAP) * (4 * 2) + PG_PIECE_W
-    PG_WINDOW_H   = (PG_PIECE_H + PG_GAP) * 4 + PG_PIECE_H
+    PG_WINDOW_W   = (PG_PIECE_W + PG_GAP) * (BOARD_SIZE * 2) + PG_PIECE_W
+    PG_WINDOW_H   = (PG_PIECE_H + PG_GAP) * BOARD_SIZE + PG_PIECE_H
 
-    def __init__(self):
-        super().__init__("quarto")
-        self.cpp_env = quarto_cpp.QuartoEnvCpp()
+    def __init__(self, render_mode=None):
+        super().__init__()
+        self.render_mode = render_mode
+
+        self.phase = Phase.SELECT
+        self.current_piece = np.zeros(5, dtype=np.float32)
+        self.board = np.zeros(16*5, dtype=np.float32)
+        self.pieces: np.ndarray = np.array([
+            1,1,1,1,1 ,1,1,1,0,1 ,1,1,0,1,1 ,1,1,0,0,1,
+            1,0,1,1,1 ,1,0,1,0,1 ,1,0,0,1,1 ,1,0,0,0,1,
+            0,1,1,1,1 ,0,1,1,0,1 ,0,1,0,1,1 ,0,1,0,0,1,
+            0,0,1,1,1 ,0,0,1,0,1 ,0,0,0,1,1 ,0,0,0,0,1
+        ])
+
+        self.action_space = spaces.Discrete(16, dtype=np.int32)
+        self.observation_space = spaces.Box(
+            low=0.0, high=1.0,
+            shape=(1 + len(self.current_piece) + len(self.board) + len(self.pieces),),
+            dtype=np.float32
+        )
+
+        self._obs_buffer = np.zeros(self.observation_space.shape[0], dtype=np.float32)
+        self._action_mask_buffer = np.zeros(self.action_space.n, dtype=np.int8)
         self._pygame_ready = False
+        self._win_lines = [
+            (0,1,2,3), (4,5,6,7), (8,9,10,11), (12,13,14,15),
+            (0,4,8,12), (1,5,9,13), (2,6,10,14), (3,7,11,15),
+            (0,5,10,15), (3,6,9,12)
+        ]
 
-    @property
-    def board(self): return self.cpp_env.board
+        self.screen = None
 
-    @property
-    def selected(self): return self.cpp_env.selected_piece
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
 
-    @property
-    def available_ps(self): return self.cpp_env.available_pieces
+        self.pieces[4::5] = 1
+        self.board[:] = 0
+        self.current_piece[:] = 0
 
-    @property
-    def is_game_over(self): return self.cpp_env.is_game_over
+        self.phase = Phase.SELECT
+        self.p_counter = 16
+        self.current_player = Player.PLAYER_1
+        self.agent_player = np.random.choice([Player.PLAYER_1, Player.PLAYER_2])
+        self.is_game_over = False
+        return self._get_obs(), {}
 
-    @property
-    def selecting(self): return self.cpp_env.selecting
 
-    @property
-    def current_player(self): return self.cpp_env.current_player
+    def step(self, action):
+        reward = 0.0
+        terminated = False
+        truncated = False
+        info = {}
 
-    @property
-    def agent_player(self): return self.cpp_env.agent_player
+        if self.phase == Phase.PLACE:
+            self.board[action*5:action*5+5] = self.current_piece
+            self.current_piece[:] = 0
 
-    @property
-    def score(self): return self.cpp_env.score
+            if self._check_win():
+                reward = 1.0
+                terminated = True
+                info["msg"] = f"Joueur {self.current_player} a gagné !"
+            elif self.p_counter == 0:
+                terminated = True
+                info["msg"] = "Match Nul !"
+            else:
+                self.phase = Phase.SELECT
 
-    def reset(self) -> None:
-        self.cpp_env.reset()
+        else:
+            self.p_counter -= 1
+            self.current_piece[:] = self.pieces[action*5:action*5+5]
+            self.pieces[action*5+4] = 0
 
-    def step(self, action: int) -> None:
-        self.cpp_env.step(action)
+            self.phase = Phase.PLACE
+            self.current_player = Player.PLAYER_2 if self.current_player == Player.PLAYER_1 else Player.PLAYER_1
 
-    def get_action_mask(self) -> torch.Tensor:
-        mask_list = self.cpp_env.get_action_mask()
-        return torch.tensor(mask_list, dtype=torch.float32, device=settings.device)
+        self.is_game_over = terminated
+        return self._get_obs(), reward, terminated, truncated, info
 
-    def get_observation_mask(self) -> torch.Tensor:
-        obs_list = self.cpp_env.get_observation_mask()
-        return torch.tensor(obs_list, dtype=torch.float32, device=settings.device)
 
-    def determinize(self) -> BaseEnv:
-        new_env = QuartoEnv()
-        # Copie profonde des états vers le nouveau wrapper C++
-        new_env.cpp_env.board = self.cpp_env.board
-        new_env.cpp_env.selected_piece = self.cpp_env.selected_piece
-        new_env.cpp_env.available_pieces = self.cpp_env.available_pieces
-        new_env.cpp_env.selecting = self.cpp_env.selecting
-        new_env.cpp_env.agent_player = self.cpp_env.agent_player
-        new_env.cpp_env.current_player = self.cpp_env.current_player
-        new_env.cpp_env.is_game_over = self.cpp_env.is_game_over
-        new_env.cpp_env.score = self.cpp_env.score
-        new_env._pygame_ready = self._pygame_ready
-        return new_env
-
-    # --- Rendu Pygame ---
     def render(self) -> None:
-        def _asset(piece):
-            return self.pg_assets.get(f"{piece[0]}{piece[1]}{piece[2]}{piece[3]}")
-
+        if self.render_mode != "human": return
+        
         if not self._pygame_ready:
             self._init_pygame()
             self._pygame_ready = True
 
         self.screen.fill((0, 0, 0))
 
-        for i in range(16):
-            r, c = divmod(i, 4)
-            self.pg_board[r][c].image = _asset(self.board[i*4 : i*4+4])
-            self.pg_pieces[r][c].image = _asset(self.available_ps[i*4 : i*4+4])
-            
-            self.pg_board[r][c].draw(self.screen)
-            self.pg_pieces[r][c].draw(self.screen)
-            
-        self.pg_selected.image = _asset(self.selected)
+        font = pygame.font.SysFont(None, 36)
+        phase_label = {
+            Phase.SELECT: "choisissez une pièce",
+            Phase.PLACE:  "placez la pièce",
+        }.get(self.phase, "Fin de partie")
+
+        self.screen.blit(font.render(f"Joueur {self.current_player.value} — {phase_label}", True, (255, 255, 255)), (10, 10))
+
+        for r in range(4):
+            for c in range(4):
+                self.pg_board[r][c].image  = self._asset(self.board[(r*4+c)*5 : (r*4+c)*5+5])
+                self.pg_pieces[r][c].image = self._asset(self.pieces[(r*4+c)*5 : (r*4+c)*5+5])
+                self.pg_board[r][c].draw(self.screen)
+                self.pg_pieces[r][c].draw(self.screen)
+
+        self.pg_selected.image = self._asset(self.current_piece[:5])
         self.pg_selected.draw(self.screen)
-
-        if self.is_game_over:
-            font = pygame.font.SysFont(None, 64)
-            text = f"Partie terminee joueur {self.current_player} a gagne"
-            self.screen.blit(font.render(text, True, (255, 255, 255)), 
-                             (self.PG_WINDOW_W/2 - font.size(text)[0]/2, 
-                              self.PG_WINDOW_H/2 - font.size(text)[1]/2))
-        else:
-            font = pygame.font.SysFont(None, 36)
-            text = "choisissez une piece" if self.selecting else "placez la piece"
-            self.screen.blit(font.render(f"Joueur {self.current_player} - {text}", True, (255, 255, 255)), (10, 10))
-
         pygame.display.flip()
+
+
+    def close(self):
+        if self.screen is not None:
+            pygame.quit()
+            self.screen = None
+
+
+    def _get_obs(self):
+        np.concatenate(([self.phase.value], self.current_piece, self.board, self.pieces), out=self._obs_buffer)
+        return self._obs_buffer
+
+
+    def _get_action_mask(self):
+        if self.phase == Phase.SELECT:
+            self._action_mask_buffer[:] = self.pieces[4::5]
+        else:
+            self._action_mask_buffer[:] = (self.board[4::5] == 0).astype(np.int8)
+        return self._action_mask_buffer
+
+
+    def _check_win(self):
+        for (i1, i2, i3, i4) in self._win_lines:
+            if self.board[i1*5 + 4] == 0:   continue
+            if self.board[i2*5 + 4] == 0:   continue
+            if self.board[i3*5 + 4] == 0:   continue
+            if self.board[i4*5 + 4] == 0:   continue
+
+            for i in range(4):
+                if self.board[i1*5+i] == self.board[i2*5+i] == self.board[i3*5+i] == self.board[i4*5+i]:
+                    return True
+
+        return False
+
+
+    def _asset(self, piece: np.ndarray):
+        if piece[4] == 0:
+            return None
+        return self.pg_assets.get("".join(map(str, piece[:4].astype(int))))
 
     def _init_pygame(self):
         pygame.init()
-        self.screen    = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
         self.pg_assets = {
             f"{i:04b}": pygame.transform.scale(
                 pygame.image.load(f"{settings.quarto_assets_path}/{i:04b}.png"),
                 (self.PG_PIECE_W, self.PG_PIECE_H)
             )
-            for i in range(16)
+            for i in range(self.NUM_PIECES)
         }
         self.pg_assets["-1-1-1-1"] = None
 
@@ -133,47 +195,20 @@ class QuartoEnv(BaseEnv):
         self.pg_selected = ImageButton(self.PG_WINDOW_W - self.PG_PIECE_W, 0,
                                         self.PG_PIECE_W, self.PG_PIECE_H)
 
-    def humain_vs_random(self):
-        agent  = RandomPlayer(action_dim=16 * 2)
-        self.render()
 
-        while 1:
-            if self.current_player == self.agent_player:
-                action = int(np.argmax(agent.forward(x=None, mask=self.get_action_mask())))
-                self.step(action)
-            else:
-                action = self._wait_for_human_click()
-                self.step(action)
-
-            self.render()
-
-    def humain_vs_humain(self):
-        self.render()
-        while 1:
-            if self.current_player == self.agent_player:
-                action = self._wait_for_human_click()
-                self.step(action)
-            else:
-                action = self._wait_for_human_click()
-                self.step(action)
-            print("step", step)
-            self.render()
-
-    def _wait_for_human_click(self) -> int:
+    def _wait_for_human_click(self, mask: np.ndarray) -> int:
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
+                    self.close()
                     raise SystemExit
                 for r in range(4):
                     for c in range(4):
-                        grid = self.pg_pieces if self.selecting else self.pg_board
-                        if grid[r][c].is_clicked(event):
-                            offset = 16 if self.selecting else 0
-                            return r * 4 + c + offset
-
-def main():
-    QuartoEnv().humain_vs_random()
-
-if __name__ == "__main__":
-    main()
+                        if self.phase == Phase.SELECT:
+                            if self.pg_pieces[r][c].is_clicked(event):
+                                if mask[r * 4 + c] == 1:
+                                    return r * 4 + c
+                        else:
+                            if self.pg_board[r][c].is_clicked(event):
+                                if mask[r * 4 + c] == 1:
+                                    return r * 4 + c

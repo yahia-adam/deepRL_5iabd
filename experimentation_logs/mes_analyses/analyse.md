@@ -81,3 +81,12 @@ Le drame : La Gen 3 a complètement oublié comment battre "Pierre" (Gen 1), car
 # tic tact toe
 
 ![alt text](image-2.png)
+
+
+# quarto
+
+en python pure 270 partie par s
+en python torch tensor cpu 190 partie par s
+en python torch tensor gpu 70 partie par s
+en c++ pure 300_000 partie par s
+en c++ avec pybind 400 partie par s

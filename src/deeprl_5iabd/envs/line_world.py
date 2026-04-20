@@ -1,156 +1,124 @@
+import time
 import pygame
 import numpy as np
-from deeprl_5iabd.config import settings
-from deeprl_5iabd.helper import ImageButton
-from deeprl_5iabd.envs.base_env import ModelBasedEnv, BaseEnv
+import gymnasium as gym
+from gymnasium import spaces
 
-class LineWorld(ModelBasedEnv):
-    """Environnement 1D : ligne de 5 positions (0-4).
+class LineWorldEnv(gym.Env):
+    """
+    Environnement 1D : ligne de 5 positions (0-4).
     - Position 0 : récompense -1 (terminal)
     - Position 4 : récompense +1 (terminal)
     - Positions 1-3 : récompense 0
     - Actions : 0=gauche, 1=droite
     """
+    metadata = {"render_modes": ["human"], "render_fps": 4}
 
-    BOARD_SIZE = 5
+    def __init__(self, render_mode=None):
+        super().__init__()
+        
+        self.size = 5
+        self.render_mode = render_mode
 
-    PG_PIECE_W = 250
-    PG_PIECE_H = 250
-    PG_GAP = 5
+        # Architecture Gym : Définition des espaces
+        self.observation_space = spaces.Discrete(self.size)
+        self.action_space = spaces.Discrete(2) # 0: Gauche, 1: Droite
 
-    PG_WINDOW_W = (PG_PIECE_W + PG_GAP) * BOARD_SIZE
-    PG_WINDOW_H = (PG_PIECE_H + PG_GAP)
+        # Variables Pygame
+        self.window_size = 1000
+        self.cell_size = self.window_size // self.size
+        self.window = None
+        self.clock = None
 
-    def __init__(self):
-        super().__init__("line_world")
-        self.agent_pos = 2
-        self.T = [[0], [4]]
-        self.A = [0, 1]
-        self.R = [-1, 0, 1]
+    def reset(self, seed=None, options=None):
+        # Obligatoire dans Gym pour la reproductibilité
+        super().reset(seed=seed)
 
-        self.p = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
-        self.p[1, 0, 0, 0] = 1 # S=1, A=gauche, S'=0, R=-1
-        self.p[2, 0, 1, 1] = 1 # S=2, A=gauche, S'=1, R=0
-        self.p[3, 0, 2, 1] = 1 # S=3, A=gauche, S'=2, R=0
+        self.agent_pos = 2 # Position initiale
+        return self.agent_pos, {} # Retourne (observation, info)
 
-        self.p[1, 1, 2, 1] = 1 # S=1, A=droite, S'=2, R=0
-        self.p[2, 1, 3, 1] = 1 # S=2, A=droite, S'=3, R=0
-        self.p[3, 1, 4, 2] = 1 # S=3, A=droite, S'=4, R=1
+    def step(self, action):
+        # 1. Appliquer l'action
+        if action == 0:   # Gauche
+            self.agent_pos = max(0, self.agent_pos - 1)
+        elif action == 1: # Droite
+            self.agent_pos = min(self.size - 1, self.agent_pos + 1)
 
-        self._pygame_initialized = False
+        # 2. Vérifier si l'état est terminal
+        terminated = (self.agent_pos == 0) or (self.agent_pos == 4)
 
-    def num_states(self):
-        return 5
+        # 3. Calculer la récompense
+        if self.agent_pos == 0:
+            reward = -1.0
+        elif self.agent_pos == 4:
+            reward = 1.0
+        else:
+            reward = 0.0
 
-    def num_actions(self):
-        return 2
+        # Retourne : observation, reward, terminated, truncated, info
+        return self.agent_pos, reward, terminated, False, {}
 
-    def num_rewards(self):
-        return 3
-
-    def state_id(self, state) -> int:
-        return state[0]
-
-    def determinize(self) -> BaseEnv:
-        new_env = LineWorld()
-        new_env.agent_pos = self.agent_pos
-        return new_env
-
-    def reset(self):
-        self.agent_pos = 2
-
-    def step(self, action) -> None:
-        if self.is_game_over():
+    def render(self):
+        if self.render_mode != "human":
             return
 
-        match action:
-            case 0: self.agent_pos -= 1
-            case 1: self.agent_pos += 1
+        if self.window is None:
+            pygame.init()
+            self.window = pygame.display.set_mode((self.window_size, self.cell_size))
+            pygame.display.set_caption("LineWorld Gym")
+            self.clock = pygame.time.Clock()
 
-    def is_game_over(self):
-        return  self.agent_pos in [0,4]
+        self.window.fill((30, 30, 30)) # Fond sombre
 
-    def score(self) -> float:
-        if not (0 <= self.agent_pos < 5):
-            raise ValueError(f"Error agent_pos {self.agent_pos}: agent hors de la grille")
+        for i in range(self.size):
+            rect = (i * self.cell_size, 0, self.cell_size, self.cell_size)
+            
+            # Couleurs des cases (Rouge = -1, Vert = +1, Gris = neutre)
+            color = (100, 100, 100)
+            if i == 0: color = (200, 50, 50)
+            if i == 4: color = (50, 200, 50)
+            
+            pygame.draw.rect(self.window, color, rect)
+            pygame.draw.rect(self.window, (0, 0, 0), rect, 2) # Bordure
 
-        match self.agent_pos:
-            case 0:
-                return self.R[0]
-            case 4:
-                return self.R[2]
-            case _:
-                return self.R[1]
-
-    def get_observation_space(self) -> list[int]:
-        return [self.agent_pos]
- 
-    def get_action_space(self) -> list[int]:
-        """0: gauche, 1: droite"""
-        action = [1,1]
-        if self.agent_pos == 0:
-            action[0] = 0
-        if self.agent_pos == 4:
-            action[1] = 0
-        return action
-    
-    def render(self) -> None:
-        if not self._pygame_initialized:
-            self._init_pygame()
-
-        self.screen.fill((30, 30, 30))
-
-        for i in range(self.BOARD_SIZE):
-            self.pg_board[i].image = None
+            # Dessiner l'agent (Cercle bleu)
             if i == self.agent_pos:
-                self.pg_board[i].image = self.pg_assets[self.last_action]
-            self.pg_board[i].draw(self.screen)
+                center = (i * self.cell_size + self.cell_size // 2, self.cell_size // 2)
+                pygame.draw.circle(self.window, (50, 150, 255), center, self.cell_size // 3)
+
         pygame.display.flip()
+        self.clock.tick(self.metadata["render_fps"])
 
-    def _init_pygame(self):
-        pygame.init()
-        self.last_action = 1
-        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
-        pygame.display.set_caption("LineWorld")
-        self._pygame_initialized = True
-
-        self.pg_assets = [
-            pygame.transform.scale(
-                pygame.image.load(f"{settings.line_world_assets_path}/{i}.png"),
-                (self.PG_PIECE_W, self.PG_PIECE_H)
-            )
-            for i in range(0, 2)
-        ]
-
-        self.pg_board   = [ImageButton(x = c * self.PG_PIECE_W + c * self.PG_GAP, y = 0,
-                                        width = self.PG_PIECE_W, height = self.PG_PIECE_H)
-                            for c in range(self.BOARD_SIZE)]
-        self.pg_board[0].score_text = str(self.R[0])
-        self.pg_board[0].score_color = (255, 0, 0)
-        self.pg_board[4].score_text = str(self.R[2])
-        self.pg_board[4].score_color = (0, 255, 0)
-
-    def _play(self):
-        self.reset()
-        while not self.is_game_over():
-            self.render()
-            action = None
-            while action is None:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        pygame.quit()
-                        return
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_LEFT:
-                            action = 0
-                            self.last_action = action
-                            self.step(action)
-                        elif event.key == pygame.K_RIGHT:
-                            action = 1
-                            self.last_action = action
-                            self.step(action)
-                        self.render()
+    def close(self):
+        if self.window is not None:
+            pygame.quit()
+            self.window = None
 
 if __name__ == "__main__":
-    env = LineWorld()
-    env._play()
+    env = LineWorldEnv(render_mode="human")
+    obs, info = env.reset()
+    env.render()
+
+    print("Jouez avec les flèches GAUCHE et DROITE. Fermez la fenêtre pour quitter.")
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.KEYDOWN:
+                action = None
+                if event.key == pygame.K_LEFT:  action = 0
+                if event.key == pygame.K_RIGHT: action = 1
+
+                if action is not None:
+                    obs, reward, terminated, truncated, info = env.step(action)
+                    env.render()
+
+                    if terminated:
+                        print(f"Fin de partie ! Récompense obtenue : {reward}")
+                        env.reset()
+                        env.render()
+
+    env.close()

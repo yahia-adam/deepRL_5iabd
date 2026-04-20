@@ -1,6 +1,11 @@
 import torch
 import pygame
+from enum import IntEnum
 from deeprl_5iabd.config import settings
+
+class Player(IntEnum):
+    PLAYER_1 = 0
+    PLAYER_2 = 1
 
 class ImageButton:
     def __init__(self, x, y, width, height):

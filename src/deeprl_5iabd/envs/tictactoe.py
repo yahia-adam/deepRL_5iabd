@@ -1,19 +1,28 @@
+import time
 import pygame
 import numpy as np
-from deeprl_5iabd.envs.base_env import ModelBasedEnv
+import gymnasium as gym
+from gymnasium import spaces
+from deeprl_5iabd.helper import Player
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
-from deeprl_5iabd.agents.random_agent import RandomPlayer
 
-class TicTacToe(ModelBasedEnv):
+class TicTacToeEnv(gym.Env):
     """
-    Jeu de morpion 3x3.
-    Récompenses : -1.0 si le joueur 1 gagne, 0.0 si match nul, 1.0 si le joueur 0 gagne.
-    Le joueur 0 est représenté par des O et le joueur 1 par des X.
-    Le joueur 0 commence toujours.
-    Actions [0..8]: 0=haut-gauche, 1=haut-milieu, ....
+    Environnement TicTacToe (Morpion 3x3).
+    - Joueur 0 (O) : commence, cherche à maximiser (récompense +1.0 si victoire)
+    - Joueur 1 (X) : cherche à minimiser (récompense -1.0 si victoire)
+    - Match nul : récompense 0.0
+    - Grille vide = -1
     """
+    metadata = {"render_modes": ["human"], "render_fps": 30}
 
+    # Combinaisons gagnantes pré-calculées pour des perfs maximales
+    WIN_PATTERNS = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], # Lignes
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], # Colonnes
+        [0, 4, 8], [2, 4, 6]             # Diagonales
+    ]
     BOARD_SIZE = 3
 
     TEXT_H = 40
@@ -24,81 +33,54 @@ class TicTacToe(ModelBasedEnv):
     PG_WINDOW_W = (PG_PIECE_W + PG_GAP) * BOARD_SIZE
     PG_WINDOW_H = (PG_PIECE_H + PG_GAP) * BOARD_SIZE + TEXT_H
 
-    # Toutes les combinaisons gagnantes
-    WIN_PATTERNS = [
-        # lignes
-        [0, 1, 2],
-        [3, 4, 5],
-        [6, 7, 8],
+    def __init__(self, render_mode=None):
+        super().__init__()
 
-        # colonnes
-        [0, 3, 6],
-        [1, 4, 7],
-        [2, 5, 8],
+        self.render_mode = render_mode
 
-        # diagonales
-        [0, 4, 8],
-        [2, 4, 6],
-    ]
+        self.board = np.full(9, -1, dtype=np.float32)
 
-    def __init__(self):
-        super().__init__("TicTacToe")
-        self.reset()
-        self.A = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-        self.R = [-1.0, 0.0, 1.0]
-        self._create_p()
+        self.action_space = spaces.Discrete(len(self.board), dtype=np.int8) 
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(1+len(self.board),), dtype=np.float32)
+
+        self._obs_buffer = np.zeros(self.observation_space.shape[0], dtype=np.float32)
+        self._action_mask_buffer = np.zeros(self.action_space.n, dtype=np.int8)
+
         self._pygame_ready = False
+        self.screen = None
 
-    def num_states(self):
-        return 3**9
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
 
-    def num_actions(self):
-        return 9
+        self.board[:] = -1
+        self.current_player = Player.PLAYER_1
+        self.agent_player = np.random.choice([Player.PLAYER_1, Player.PLAYER_2])
+        self.count_step = 0
 
-    def num_rewards(self):
-        return 3
+        return self._get_obs(), {}
 
-    def state_id(self, state) -> int:
-        state_normalized = np.array(state) + 1
-        powers_of_3 = 3 ** np.arange(9)
-        return int(np.dot(state_normalized, powers_of_3))
+    def step(self, action):
+        self.board[action] = self.current_player.value
+        self.count_step += 1
 
-    def determinize(self):
-        new_env = TicTacToe()
-        new_env.board = self.board.copy()
-        new_env.player = self.player
-        return new_env
+        terminated = False
+        truncated = False
+        reward = 0.0
 
-    def reset(self) -> None:
-        self.board = np.array([-1]*9)
-        self.player = 0
+        if self._check_win():
+            terminated = True
+            reward = 1.0 if self.current_player == self.agent_player else -1.0
+        elif self.count_step == 9:
+            terminated = True
+            reward = 0.0
 
-    def is_game_over(self) -> bool:
-        if self.score() != 0:
-            return True
-        if np.all(self.board != -1):
-            return True
-        return False
-
-    def get_observation_space(self) -> np.ndarray:
-        return self.board.tolist()
-
-    def get_action_space(self):
-        return (self.board == -1).astype(int)
-
-    def step(self, action: int) -> None:
-        self.board[action] = self.player
-        self.player = 0 if self.player == 1 else 1
-
-    def score(self) -> float:
-        for pattern in self.WIN_PATTERNS:
-            a,b,c = pattern
-            if self.board[a] == self.board[b] == self.board[c] and self.board[a] != -1:
-                return self.R[0] if self.board[a] == 1 else self.R[2]
-
-        return self.R[1]
+        self.current_player = Player.PLAYER_2 if self.current_player == Player.PLAYER_1 else Player.PLAYER_1
+        return self._get_obs(), reward, terminated, False, {}
 
     def render(self) -> None:
+        if self.render_mode != "human":
+            return
+
         if not self._pygame_ready:
             self._init_pygame()
             self._pygame_ready = True
@@ -106,56 +88,23 @@ class TicTacToe(ModelBasedEnv):
         self.screen.fill((0, 0, 0))
 
         font = pygame.font.SysFont(None, 36)
-        self.screen.blit(font.render(f"Joueur {self.player} jouer", True, (255, 255, 255)), (10, 10))
+        self.screen.blit(font.render(f"Joueur {self.current_player} jouer", True, (255, 255, 255)), (10, 10))
 
         for r in range(3):
             for c in range(3):
-                if self.board[r * self.BOARD_SIZE + c] == 0:
+                if self.board[r * 3 + c] == Player.PLAYER_1.value:
                     self.pg_board[r][c].image = self.pg_assets[0]
-                elif self.board[r * self.BOARD_SIZE + c] == 1:
+                if self.board[r * 3 + c] == Player.PLAYER_2.value:
                     self.pg_board[r][c].image = self.pg_assets[1]
                 self.pg_board[r][c].draw(self.screen)
 
         pygame.display.flip()
 
-    def _create_p(self):
-        self.p = {}
-        self._explore_from_state()
 
-    def _explore_from_state(self):
-        pass
-        # s_id = self.state_id(self.board)
-        # if s_id in self.p:
-        #     return
-
-        # self.p[s_id] = {}
-        # over = self.is_game_over()
-        # mask = self.get_action_space()
-
-        # for a in range(9):
-        #     if over or mask[a] == 0:
-        #         # On définit l'issue d'une action impossible ou finie
-        #         self.p[s_id][a] = [(1.0, s_id, 0.0, True)]
-        #     else:
-        #         # 1. Sauvegarde l'état du joueur avant le coup
-        #         prev_player = self.player
-
-        #         # 2. Joue le coup (modifie self.board et self.player)
-        #         self.step(a)
-
-        #         # 3. Enregistre les résultats
-        #         next_s_id = self.state_id(self.board)
-        #         res_reward = self.score()
-        #         res_done = self.is_game_over()
-        #         self.p[s_id][a] = [(1.0, next_s_id, res_reward, res_done)]
-
-        #         # 4. Explore la suite si ce n'est pas fini
-        #         if not res_done:
-        #             self._explore_from_state()
-
-        #         # 5. BACKTRACK : On remet le plateau ET le joueur à l'état initial
-        #         self.board[a] = -1
-        #         self.player = prev_player
+    def close(self):
+        if self.screen is not None:
+            pygame.quit()
+            self.screen = None
 
     def _init_pygame(self) -> None:
         pygame.init()
@@ -194,25 +143,26 @@ class TicTacToe(ModelBasedEnv):
             for r in range(3)
         ]
 
-    def humain_vs_random(self):
-        agent   = RandomPlayer(action_dim=len(self.get_action_space()))
-        running = True
-        self.render()
 
-        while running:
-            if self.player == 0:
-                action = int(np.argmax(agent.forward(x=None, mask=self.get_action_space())))
-            else:
-                action = self._wait_for_human_click()
-            
-            self.step(action)
-            self.render()
-            running = not self.is_game_over()
+    def _check_win(self):
+        for p in self.WIN_PATTERNS:
+            if self.board[p[0]] == self.board[p[1]] == self.board[p[2]] != -1:
+                return True
+        return False
 
-        self.render()
-        print({0: "Match nul", 1: "Random a gagné", -1: "Vous avez gagné"}[self.score()])
+    def _get_obs(self):
+        np.concatenate(([self.current_player], self.board), out=self._obs_buffer)
+        return self._obs_buffer
 
-    def _wait_for_human_click(self) -> int:
+
+    def _get_action_mask(self):
+        return (self.board == -1).astype(np.int8)
+
+
+    def _wait_for_human_click(self, mask) -> int:
+        if (self._pygame_ready == False):
+            self._init_pygame()
+            self._pygame_ready = True
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -221,8 +171,5 @@ class TicTacToe(ModelBasedEnv):
                 for r in range(3):
                     for c in range(3):
                         if self.pg_board[r][c].is_clicked(event):
-                            return r * 3 + c
-
-if __name__ == "__main__":
-    env = TicTacToe()
-    env.humain_vs_random()
+                            if mask[r * 3 + c] == 1:
+                                return r * 3 + c

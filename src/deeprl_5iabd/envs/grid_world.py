@@ -1,229 +1,141 @@
+import time
 import pygame
 import numpy as np
-from deeprl_5iabd.envs.base_env import ModelBasedEnv, BaseEnv
-from deeprl_5iabd.config import settings
-from deeprl_5iabd.helper import ImageButton
-from deeprl_5iabd.agents.random_agent import RandomPlayer
+import gymnasium as gym
+from gymnasium import spaces
 
-class GridWorld(ModelBasedEnv):
+class GridWorldEnv(gym.Env):
     """
-    Un agent se déplace sur une grille 5x5. 
-    Il part de (0,0) et doit atteindre (0,4).
-    (0,4) donne une récompense de 1.0.
-    (4,4) donne une récompense de -3.0.
-    Toutes les autres cases donnent une récompense de 0.0.
-    Actions : 0=bas, 1=haut, 2=droite, 3=gauche
-    model based env donc on doit créer p et on teste avec q-learning.
+    Environnement Grille 2D (5x5).
+    - Position initiale : (0, 0)
+    - Position (4, 4) : récompense +1.0 (terminal)
+    - Position (0, 4) : récompense -1.0 (terminal)
+    - Actions : 0=bas, 1=haut, 2=droite, 3=gauche
     """
+    metadata = {"render_modes": ["human"], "render_fps": 10}
 
-    BOARD_SIZE = 5
+    def __init__(self, render_mode=None):
+        super().__init__()
 
-    PG_PIECE_W = 150
-    PG_PIECE_H = 150
-    PG_GAP = 5
+        self.size = 5
+        self.render_mode = render_mode
 
-    PG_WINDOW_W = (PG_PIECE_W + PG_GAP) * BOARD_SIZE
-    PG_WINDOW_H = (PG_PIECE_H + PG_GAP) * BOARD_SIZE
+        # Espace d'observation : tableau [ligne, colonne] allant de [0, 0] à [4, 4]
+        self.observation_space = spaces.MultiDiscrete([self.size, self.size])
 
-    def __init__(self):
-        super().__init__("GridWorld")
-        self.reset()
-        self.T = [(0,4), (4,4)]
-        self.A = [0, 1, 2, 3]     # 0=bas, 1=haut, 2=droite, 3=gauche
-        self.R = [-3.0, 0.0, 1.0]
-        self.p = self._create_p()
-        self._pygame_initialized = False
+        # Espace d'action : 4 actions possibles
+        self.action_space = spaces.Discrete(4) 
 
-    def num_states(self):
-        return 25
+        # Variables Pygame
+        self.window_size = 500  # 500x500 pixels (100 pixels par case)
+        self.cell_size = self.window_size // self.size
+        self.window = None
+        self.clock = None
 
-    def num_actions(self):
-        return 4
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
 
-    def num_rewards(self):
-        return 3
+        # L'agent commence toujours en haut à gauche (ligne 0, colonne 0)
+        self.agent_pos = np.array([0, 0], dtype=np.int32)
+        return self.agent_pos, {}
 
-    def state_id(self, state) -> int:
-        return state[0] * self.BOARD_SIZE + state[1]
+    def step(self, action):
+        row, col = self.agent_pos
 
-    def determinize(self) -> BaseEnv:
-        new_env = GridWorld()
-        new_env.agent_pos = self.agent_pos
-        new_env.board = self.board.copy()
-        return new_env        
+        # 1. Appliquer l'action (avec blocage aux bords)
+        if action == 0:   # Bas
+            row = min(self.size - 1, row + 1)
+        elif action == 1: # Haut
+            row = max(0, row - 1)
+        elif action == 2: # Droite
+            col = min(self.size - 1, col + 1)
+        elif action == 3: # Gauche
+            col = max(0, col - 1)
 
-    def _create_p(self):
-        # 0=bas, 1=haut, 2=droite, 3=gauche
-        # 0=-3.0,  1=0.0,    2=1.0
-        # p[s, a, s_prime, r_idx]
-        p = np.zeros((self.num_states(), self.num_actions(), self.num_states(), self.num_rewards()))
-        terminal_ids = [self.state_id(t) for t in self.T]
+        self.agent_pos = np.array([row, col], dtype=np.int32)
 
-        down_border = [20, 21, 22, 23, 24]
-        up_border = [0, 1, 2, 3, 4]
-        left_border = [0, 5, 10, 15, 20]
-        right_border = [4, 9, 14, 19, 24]
+        # 2. Vérifier si l'état est terminal et calculer la récompense
+        terminated = False
+        reward = 0.0
 
-        for s in range(self.num_states()):
-            if s in terminal_ids:
-                continue
+        if row == 4 and col == 4:
+            terminated = True
+            reward = 1.0
+        elif row == 0 and col == 4:
+            terminated = True
+            reward = -1.0
 
-            for a in range(self.num_actions()):
-                is_collision = False
-                next_s = s
+        return self.agent_pos, reward, terminated, False, {}
 
-                if a == 0:
-                    is_collision = s in down_border
-                    next_s = s + 5
-                elif a == 1:
-                    is_collision = s in up_border
-                    next_s = s - 5
-                elif a == 2:
-                    is_collision = s in right_border
-                    next_s = s + 1
-                elif a == 3:
-                    is_collision = s in left_border
-                    next_s = s - 1
-
-                # la récompense
-                if is_collision:
-                    p[s, a, s, 1] = 1.0
-                else:
-                    r_idx = 1 # 0 par défaut
-                    if next_s == 4: r_idx = 2  # 1
-                    elif next_s == 24: r_idx = 0 # -3
-
-                    p[s, a, next_s, r_idx] = 1.0
-
-        return p
-
-    def available_actions(self) -> np.ndarray:
-        if self.is_game_over():
-            return np.array([])
-        am = self.get_action_space()
-        return np.array([a for a in self.A if am[a] == 1])
-
-    def reset(self) -> None:
-        self.board = np.full((self.BOARD_SIZE, self.BOARD_SIZE), -1)
-        self.agent_pos = (0, 0)
-        self.board[self.agent_pos] = 1
-
-    def is_game_over(self) -> bool:
-        return self.agent_pos == (4, 4) or self.agent_pos == (0, 4)
-
-    def get_observation_space(self):
-        return list(self.agent_pos)
-
-    def get_action_space(self) -> list[int]:
-        picks = np.ones(4)
-        if self.agent_pos[0] == 0:
-            picks[1] = 0
-        if self.agent_pos[1] == 0:
-            picks[3] = 0
-        if self.agent_pos[0] == self.BOARD_SIZE - 1:
-            picks[0] = 0
-        if self.agent_pos[1] == self.BOARD_SIZE - 1:
-            picks[2] = 0
-        return picks.tolist()
-
-    def step(self, action: int) -> None:
-        """0: bas, 1: haut, 2: droite, 3: gauche"""
-        if self.get_action_space()[action] == 0:
+    def render(self):
+        if self.render_mode != "human":
             return
 
-        self.board[self.agent_pos] = -1
-        if action == 0:
-            self.agent_pos = (self.agent_pos[0] + 1, self.agent_pos[1])
-        elif action == 1:
-            self.agent_pos = (self.agent_pos[0] - 1, self.agent_pos[1])
-        elif action == 2:
-            self.agent_pos = (self.agent_pos[0], self.agent_pos[1] + 1)
-        elif action == 3:
-            self.agent_pos = (self.agent_pos[0], self.agent_pos[1] - 1)
-        self.board[self.agent_pos] = 1
+        if self.window is None:
+            pygame.init()
+            self.window = pygame.display.set_mode((self.window_size, self.window_size))
+            pygame.display.set_caption("GridWorld Gym")
+            self.clock = pygame.time.Clock()
 
-    def score(self) -> float:
-        if self.agent_pos == (4, 4):
-            return self.R[0]
-        elif self.agent_pos == (0, 4):
-            return self.R[2]
-        else:
-            return self.R[1]
+        self.window.fill((30, 30, 30)) # Fond sombre
 
-    def render(self) -> None:
-        if not self._pygame_initialized:
-            self._init_pygame()
-            self._pygame_initialized = True
-        
-        self.screen.fill((30, 30, 30))
-        for r in range(self.BOARD_SIZE):
-            for c in range(self.BOARD_SIZE):
-                if self.board[r, c] == 1:
-                    self.pg_board[r][c].image = self.pg_assets[self.last_action]
-                else:
-                    self.pg_board[r][c].image = None
-                self.pg_board[r][c].draw(self.screen)
+        for r in range(self.size):
+            for c in range(self.size):
+                # Attention dans Pygame : X=colonne, Y=ligne
+                rect = (c * self.cell_size, r * self.cell_size, self.cell_size, self.cell_size)
+                
+                # Couleurs par défaut (Gris)
+                color = (100, 100, 100)
+                
+                # Coloration des cases spéciales
+                if r == 4 and c == 4: color = (50, 200, 50)   # Vert : Récompense +1
+                if r == 0 and c == 4: color = (200, 50, 50)   # Rouge : Récompense -1
+                
+                pygame.draw.rect(self.window, color, rect)
+                pygame.draw.rect(self.window, (0, 0, 0), rect, 2) # Bordure
+
+        # Dessiner l'agent (Cercle bleu)
+        agent_r, agent_c = self.agent_pos
+        center_x = agent_c * self.cell_size + self.cell_size // 2
+        center_y = agent_r * self.cell_size + self.cell_size // 2
+        pygame.draw.circle(self.window, (50, 150, 255), (center_x, center_y), self.cell_size // 3)
+
         pygame.display.flip()
+        self.clock.tick(self.metadata["render_fps"])
 
-    def _init_pygame(self) -> None:
-        pygame.init()
-        self.last_action = 0
-        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
-        pygame.display.set_caption("GridWorld")
+    def close(self):
+        if self.window is not None:
+            pygame.quit()
+            self.window = None
 
-        self.pg_assets = [
-            pygame.transform.scale(
-                pygame.image.load(
-                    f"{settings.grid_world_assets_path}/{i}.png"
-                ),
-                (self.PG_PIECE_W, self.PG_PIECE_H),
-            )
-            for i in range(0, 4)
-        ]
-        self.pg_board = [
-            [
-                ImageButton(
-                    c * (self.PG_PIECE_W + self.PG_GAP),
-                    r * (self.PG_PIECE_H + self.PG_GAP),
-                    self.PG_PIECE_W,
-                    self.PG_PIECE_H,
-                )
-                for c in range(self.BOARD_SIZE)
-            ]
-            for r in range(self.BOARD_SIZE)
-        ]
-
-        self.pg_board[0][4].score_text = str(self.R[2])
-        self.pg_board[0][4].score_color = (0, 255, 0)
-        self.pg_board[4][4].score_text = str(self.R[0])
-        self.pg_board[4][4].score_color = (255, 0, 0)
-
-    def _play(self):
-        self.reset()
-        while not self.is_game_over():
-            self.render()
-            action = None
-            actions = self.get_action_space()
-            while action is None:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        pygame.quit()
-                        return
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_LEFT:
-                            action = 3
-                        elif event.key == pygame.K_RIGHT:
-                            action = 2
-                        elif event.key == pygame.K_UP:
-                            action = 1
-                        elif event.key == pygame.K_DOWN:
-                            action = 0
-
-                        if actions[action] == 1:
-                            self.last_action = action
-                            self.step(action)
-                            self.render()
 
 if __name__ == "__main__":
-    env = GridWorld()
-    env._play()
+    env = GridWorldEnv(render_mode="human")
+    obs, info = env.reset()
+    env.render()
+
+    print("Jouez avec les flèches directionnelles. Atteignez la case verte ! Fermez la fenêtre pour quitter.")
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.KEYDOWN:
+                action = None
+                if event.key == pygame.K_DOWN:  action = 0
+                if event.key == pygame.K_UP:    action = 1
+                if event.key == pygame.K_RIGHT: action = 2
+                if event.key == pygame.K_LEFT:  action = 3
+
+                if action is not None:
+                    obs, reward, terminated, truncated, info = env.step(action)
+                    env.render()
+
+                    if terminated:
+                        print(f"Fin de partie ! Récompense obtenue : {reward}")
+                        env.reset()
+                        env.render()
+
+    env.close()
