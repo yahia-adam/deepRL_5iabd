@@ -3,139 +3,153 @@ import pygame
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
+from deeprl_5iabd.helper import Player
+from deeprl_5iabd.config import settings
+from deeprl_5iabd.helper import ImageButton
+from enum import IntEnum
+
+class Action(IntEnum):
+    UP = 0
+    DOWN = 1
+    LEFT = 2
+    RIGHT = 3
 
 class GridWorldEnv(gym.Env):
-    """
-    Environnement Grille 2D (5x5).
-    - Position initiale : (0, 0)
-    - Position (4, 4) : récompense +1.0 (terminal)
-    - Position (0, 4) : récompense -1.0 (terminal)
-    - Actions : 0=bas, 1=haut, 2=droite, 3=gauche
-    """
-    metadata = {"render_modes": ["human"], "render_fps": 10}
+    BOARD_SIZE = 5
+
+    PG_PIECE_W = 150
+    PG_PIECE_H = 150
+    PG_GAP = 5
+
+    PG_WINDOW_W = (PG_PIECE_W + PG_GAP) * BOARD_SIZE
+    PG_WINDOW_H = (PG_PIECE_H + PG_GAP) * BOARD_SIZE
 
     def __init__(self, render_mode=None):
         super().__init__()
-
-        self.size = 5
         self.render_mode = render_mode
+        
+        self.pos = 0
 
-        # Espace d'observation : tableau [ligne, colonne] allant de [0, 0] à [4, 4]
-        self.observation_space = spaces.MultiDiscrete([self.size, self.size])
+        self.action_space = spaces.Discrete(4)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(25,), dtype=np.float32)
 
-        # Espace d'action : 4 actions possibles
-        self.action_space = spaces.Discrete(4) 
+        self.board = np.zeros(self.observation_space.shape, dtype=np.float32)
+        self.board[0] = 1
 
-        # Variables Pygame
-        self.window_size = 500  # 500x500 pixels (100 pixels par case)
-        self.cell_size = self.window_size // self.size
-        self.window = None
-        self.clock = None
+        self._pygame_ready = False
+
+        self.agent_player = Player.PLAYER_2
+        self.current_player = Player.PLAYER_1
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-
-        # L'agent commence toujours en haut à gauche (ligne 0, colonne 0)
-        self.agent_pos = np.array([0, 0], dtype=np.int32)
-        return self.agent_pos, {}
+        self.pos = 0
+        self.board[:] = 0
+        self.board[self.pos] = 1
+        return self.board, {}
 
     def step(self, action):
-        row, col = self.agent_pos
+        self.board[self.pos] = 0
 
-        # 1. Appliquer l'action (avec blocage aux bords)
-        if action == 0:   # Bas
-            row = min(self.size - 1, row + 1)
-        elif action == 1: # Haut
-            row = max(0, row - 1)
-        elif action == 2: # Droite
-            col = min(self.size - 1, col + 1)
-        elif action == 3: # Gauche
-            col = max(0, col - 1)
+        if action == Action.UP.value and self.pos not in [0, 1, 2, 3, 4]:
+            self.pos -= 5
+        elif action == Action.DOWN.value and self.pos not in [20, 21, 22, 23, 24]:
+            self.pos += 5
+        elif action == Action.LEFT.value and self.pos not in [0, 5, 10, 15, 20]:
+            self.pos -= 1
+        elif action == Action.RIGHT.value and self.pos not in [4, 9, 14, 19, 24]:
+            self.pos += 1
 
-        self.agent_pos = np.array([row, col], dtype=np.int32)
+        self.board[self.pos] = 1
 
-        # 2. Vérifier si l'état est terminal et calculer la récompense
         terminated = False
+        truncated = False
         reward = 0.0
 
-        if row == 4 and col == 4:
+        if self.pos == 24:
             terminated = True
             reward = 1.0
-        elif row == 0 and col == 4:
+        elif self.pos == 4:
             terminated = True
             reward = -1.0
 
-        return self.agent_pos, reward, terminated, False, {}
+        return self.board, reward, terminated, truncated, {}
 
-    def render(self):
-        if self.render_mode != "human":
-            return
-
-        if self.window is None:
-            pygame.init()
-            self.window = pygame.display.set_mode((self.window_size, self.window_size))
-            pygame.display.set_caption("GridWorld Gym")
-            self.clock = pygame.time.Clock()
-
-        self.window.fill((30, 30, 30)) # Fond sombre
-
-        for r in range(self.size):
-            for c in range(self.size):
-                # Attention dans Pygame : X=colonne, Y=ligne
-                rect = (c * self.cell_size, r * self.cell_size, self.cell_size, self.cell_size)
-                
-                # Couleurs par défaut (Gris)
-                color = (100, 100, 100)
-                
-                # Coloration des cases spéciales
-                if r == 4 and c == 4: color = (50, 200, 50)   # Vert : Récompense +1
-                if r == 0 and c == 4: color = (200, 50, 50)   # Rouge : Récompense -1
-                
-                pygame.draw.rect(self.window, color, rect)
-                pygame.draw.rect(self.window, (0, 0, 0), rect, 2) # Bordure
-
-        # Dessiner l'agent (Cercle bleu)
-        agent_r, agent_c = self.agent_pos
-        center_x = agent_c * self.cell_size + self.cell_size // 2
-        center_y = agent_r * self.cell_size + self.cell_size // 2
-        pygame.draw.circle(self.window, (50, 150, 255), (center_x, center_y), self.cell_size // 3)
-
+    def render(self) -> None:
+        if not self._pygame_ready:
+            self._init_pygame()
+            self._pygame_ready = True
+        
+        self.screen.fill((30, 30, 30))
+        for r in range(self.BOARD_SIZE):
+            for c in range(self.BOARD_SIZE):
+                if self.board[r * self.BOARD_SIZE + c] == 1:
+                    self.pg_board[r][c].image = self.pg_assets[self.last_action.value]
+                else:
+                    self.pg_board[r][c].image = None
+                self.pg_board[r][c].draw(self.screen)
         pygame.display.flip()
-        self.clock.tick(self.metadata["render_fps"])
+
+
+    def _init_pygame(self) -> None:
+        pygame.init()
+        self.last_action = Action.DOWN
+        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        pygame.display.set_caption("GridWorld")
+
+        self.pg_assets = [
+            pygame.transform.scale(
+                pygame.image.load(
+                    f"{settings.grid_world_assets_path}/{i}.png"
+                ),
+                (self.PG_PIECE_W, self.PG_PIECE_H),
+            )
+            for i in range(0, 4)
+        ]
+        self.pg_board = [
+            [
+                ImageButton(
+                    c * (self.PG_PIECE_W + self.PG_GAP),
+                    r * (self.PG_PIECE_H + self.PG_GAP),
+                    self.PG_PIECE_W,
+                    self.PG_PIECE_H,
+                )
+                for c in range(self.BOARD_SIZE)
+            ]
+            for r in range(self.BOARD_SIZE)
+        ]
+
+        self.pg_board[0][4].score_text = str(-1)
+        self.pg_board[0][4].score_color = (255, 0, 0)
+        self.pg_board[4][4].score_text = str(1)
+        self.pg_board[4][4].score_color = (0, 255, 0)
+
+
+    def _wait_for_human_click(self, mask=None):
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_LEFT:
+                        self.last_action = Action.LEFT
+                        return Action.LEFT.value
+                    elif event.key == pygame.K_RIGHT:
+                        self.last_action = Action.RIGHT
+                        return Action.RIGHT.value
+                    elif event.key == pygame.K_UP:
+                        self.last_action = Action.UP
+                        return Action.UP.value
+                    elif event.key == pygame.K_DOWN:
+                        self.last_action = Action.DOWN
+                        return Action.DOWN.value
+
 
     def close(self):
-        if self.window is not None:
+        if self.screen is not None:
             pygame.quit()
-            self.window = None
+            self.screen = None
 
-
-if __name__ == "__main__":
-    env = GridWorldEnv(render_mode="human")
-    obs, info = env.reset()
-    env.render()
-
-    print("Jouez avec les flèches directionnelles. Atteignez la case verte ! Fermez la fenêtre pour quitter.")
-
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-            elif event.type == pygame.KEYDOWN:
-                action = None
-                if event.key == pygame.K_DOWN:  action = 0
-                if event.key == pygame.K_UP:    action = 1
-                if event.key == pygame.K_RIGHT: action = 2
-                if event.key == pygame.K_LEFT:  action = 3
-
-                if action is not None:
-                    obs, reward, terminated, truncated, info = env.step(action)
-                    env.render()
-
-                    if terminated:
-                        print(f"Fin de partie ! Récompense obtenue : {reward}")
-                        env.reset()
-                        env.render()
-
-    env.close()
+    def _get_action_mask(self):
+        ## pas besoin tous est autorise just ca reste sur place
+        return

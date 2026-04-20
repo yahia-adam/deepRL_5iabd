@@ -31,7 +31,7 @@ def count_n_match_time(env_name: str, num_episodes: int = 10_000):
     print(f"Temps total        : {elapsed:.3f} secondes")
     print(f"Parties par sec    : {num_episodes / elapsed:.0f}")
 
-def play_human_vs_random(env_name: str):
+def play_human_vs_random(env_name: str, is_multi_player: bool = False):
     env = load_env(env_name, render_mode="human")
     obs, _ = env.reset()
     done = False
