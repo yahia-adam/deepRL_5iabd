@@ -1,61 +1,114 @@
 import numpy as np
-import torch
-from torch.distributions import Categorical
-from deeprl_5iabd.agents.random_agent import RandomPlayer
-from deeprl_5iabd.envs.base_env import ModelBasedEnv
-from deeprl_5iabd.helper import softmax_with_mask
-
-def choose_action_epsilon_greedy(state, mask, Q, epsilon):
-    available = [a for a, m in enumerate(mask) if m == 1]
-
-    if np.random.random() < epsilon:
-        return int(np.random.choice(available))
-    else:
-        q_tensor = torch.tensor(Q[state, :], dtype=torch.float32)
-        probs = softmax_with_mask(q_tensor, mask)
-        return int(torch.argmax(probs).item())
+from gymnasium import Env
+import matplotlib.pyplot as plt
+import pickle
 
 def q_learning(
-    env: ModelBasedEnv,
-    learning_rate: float = 0.1,
-    epsilon: float = 0.1,
+    env: Env,
+    learning_rate: float = 0.9,
     gamma: float = 0.9,
-    num_episodes: int = 100_000,
-    is_two_players: bool = False
+    epsilon: float = 1.0,
+    epsilon_decay: float = 0.0001,
+    num_episodes: int = 100_000
 ):
-    Q = np.zeros((env.num_states(), env.num_actions()))
-    rp = RandomPlayer(action_dim=env.num_actions()) if is_two_players else None
+    Q = np.zeros((env.observation_space.shape[0], env.action_space.n))
+    rng = np.random.default_rng()
+    reward_per_episode = np.zeros(num_episodes)
+
+    for i in range(num_episodes):
+        _, _ = env.reset()
+        state = env._state_id()
+        terminated = False
+        truncated = False
+
+        while not terminated and not truncated:
+            if rng.random() < epsilon:
+                action = env.action_space.sample()
+            else:
+                action = np.argmax(Q[state, :])
+
+            _, reward, terminated, truncated, _ = env.step(action)
+            new_state = env._state_id()
+
+            Q[state, action] = Q[state, action] + learning_rate * (
+                reward + gamma * np.max(Q[new_state, :]) - Q[state, action]
+            )
+            state = new_state
+            reward_per_episode[i] += reward
+
+        epsilon = max(epsilon - epsilon_decay, 0.0)
+        if epsilon == 0.0:
+            learning_rate = 0.0001
+
+    sum_rewards = np.zeros(num_episodes)
+    for t in range(num_episodes):
+        sum_rewards[t] = np.sum(reward_per_episode[max(0, t - 100):t + 1])
+
+    plt.plot(sum_rewards)
+    plt.savefig("q_learning.png")
+
+    with open("q_learning.pkl", "wb") as f:
+        pickle.dump(Q, f)
+    env.close()
+
+def q_learning_tictactoe(
+    env: Env,
+    learning_rate: float = 0.1,
+    gamma: float = 0.9,
+    epsilon: float = 1.0,
+    epsilon_decay: float = 0.00005,
+    num_episodes: int = 300_000
+):
+    NUM_STATES = 3 ** 9
+    Q = np.zeros((NUM_STATES, env.action_space.n))
+    rng = np.random.default_rng()
+    reward_per_episode = np.zeros(num_episodes)
 
     for i in range(num_episodes):
         env.reset()
-        s = env.state_id(env.get_observation_space())
+        agent_player = env.agent_player
+        state = env._state_id()
+        terminated = False
+        truncated = False
 
-        while not env.is_game_over():
-            mask = env.get_action_space()
-            a = choose_action_epsilon_greedy(s, mask, Q, epsilon)
+        while not terminated and not truncated:
+            mask = env._get_action_mask()
+            valid_actions = np.where(mask == 1)[0]
 
-            old_score = env.score()
-            env.step(a)
+            if env.current_player == agent_player:
+                # Coup de l'agent Q (epsilon-greedy)
+                if rng.random() < epsilon:
+                    action = rng.choice(valid_actions)
+                else:
+                    q_masked = np.full(env.action_space.n, -np.inf)
+                    q_masked[valid_actions] = Q[state, valid_actions]
+                    action = int(np.argmax(q_masked))
 
-            if is_two_players and not env.is_game_over():
-                mask_adv = env.get_action_space()
-                probs = rp.forward(x=None, mask=mask_adv)
-                m = Categorical(probs)
-                a_adv = m.sample().item()
-                env.step(a_adv)
+                _, reward, terminated, truncated, _ = env.step(action)
+                new_state = env._state_id()
 
-            s_prime = env.state_id(env.get_observation_space())
-            r = env.score() if is_two_players else (env.score() - old_score)
+                Q[state, action] = Q[state, action] + learning_rate * (
+                    reward + gamma * np.max(Q[new_state, :]) - Q[state, action]
+                )
+                state = new_state
+                reward_per_episode[i] += reward
 
-            if not env.is_game_over():
-                mask_prime = env.get_action_space()
-                q_next = Q[s_prime].copy()
-                q_next[mask_prime == 0] = -np.inf
-                max_q_next = np.max(q_next)
             else:
-                max_q_next = 0.0
+                # Coup de l'adversaire random
+                action = rng.choice(valid_actions)
+                _, _, terminated, truncated, _ = env.step(action)
 
-            Q[s, a] += learning_rate * (r + gamma * max_q_next - Q[s, a])
-            s = s_prime
+        epsilon = max(epsilon - epsilon_decay, 0.0)
+        if epsilon == 0.0:
+            learning_rate = 0.0001
 
-    return Q
+    sum_rewards = np.zeros(num_episodes)
+    for t in range(num_episodes):
+        sum_rewards[t] = np.sum(reward_per_episode[max(0, t - 100):t + 1])
+
+    plt.plot(sum_rewards)
+    plt.savefig("q_learning_tictactoe.png")
+
+    with open("q_learning_tictactoe.pkl", "wb") as f:
+        pickle.dump(Q, f)
+    env.close()

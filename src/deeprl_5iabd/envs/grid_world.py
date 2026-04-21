@@ -40,6 +40,7 @@ class GridWorldEnv(gym.Env):
 
         self.agent_player = Player.PLAYER_2
         self.current_player = Player.PLAYER_1
+        self.screen = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -153,3 +154,6 @@ class GridWorldEnv(gym.Env):
     def _get_action_mask(self):
         ## pas besoin tous est autorise just ca reste sur place
         return
+
+    def _state_id(self):
+        return self.pos

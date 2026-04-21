@@ -173,3 +173,10 @@ class TicTacToeEnv(gym.Env):
                         if self.pg_board[r][c].is_clicked(event):
                             if mask[r * 3 + c] == 1:
                                 return r * 3 + c
+
+    def _state_id(self) -> int:
+        encoded = (self.board + 1).astype(int)
+        state = 0
+        for i, val in enumerate(encoded):
+            state += val * (3 ** i)
+        return state

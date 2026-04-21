@@ -36,6 +36,7 @@ class LineWorldEnv(gym.Env):
         self.current_player = Player.PLAYER_1
         self.agent_player = Player.PLAYER_2
         self.is_game_over = False
+        self.screen = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -63,7 +64,7 @@ class LineWorldEnv(gym.Env):
         else:
             reward = 0.0
 
-        return self.agent_pos, reward, terminated, False, {}
+        return self.board, reward, terminated, False, {}
 
     def render(self) -> None:
         if not self._pygame_initialized:
@@ -82,6 +83,9 @@ class LineWorldEnv(gym.Env):
         if self.screen is not None:
             pygame.quit()
             self.screen = None
+
+    def _state_id(self):
+        return self.agent_pos
 
     def _get_action_mask(self):
         # rien a return
