@@ -10,7 +10,7 @@ from enum import IntEnum
 from deeprl_5iabd.helper import Player
 
 class Phase(IntEnum):
-    SELECT = 0 
+    SELECT = 0
     PLACE  = 1
 
 class QuartoEnv(gym.Env):

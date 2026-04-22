@@ -34,8 +34,7 @@ class LineWorldEnv(gym.Env):
         self._pygame_initialized = False
 
         self.current_player = Player.PLAYER_1
-        self.agent_player = Player.PLAYER_2
-        self.is_game_over = False
+        self.agent_player = Player.PLAYER_1
         self.screen = None
 
     def reset(self, seed=None, options=None):

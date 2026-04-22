@@ -39,7 +39,7 @@ class GridWorldEnv(gym.Env):
         self._pygame_ready = False
 
         self.agent_player = Player.PLAYER_2
-        self.current_player = Player.PLAYER_1
+        self.current_player = Player.PLAYER_2
         self.screen = None
 
     def reset(self, seed=None, options=None):

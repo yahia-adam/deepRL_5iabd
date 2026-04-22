@@ -1,7 +1,7 @@
 import torch
 import pygame
 from enum import IntEnum
-from deeprl_5iabd.config import settings
+from torch.nn import functional as F
 
 class Player(IntEnum):
     PLAYER_1 = 0
@@ -28,7 +28,10 @@ class ImageButton:
     def is_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos)
 
-def softmax_with_mask(S, M):
+def softmax_with_mask(S, M=None):
+    if M is None:
+        return F.softmax(S, dim=-1)
+    M = M.detach() if isinstance(M, torch.Tensor) else torch.tensor(M).float()
     positive_or_null_s = S - S.min()
     masked_positive_or_null_s = positive_or_null_s * M
     negative_or_null_s = masked_positive_or_null_s - masked_positive_or_null_s.max()
