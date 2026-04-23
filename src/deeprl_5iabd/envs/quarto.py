@@ -26,7 +26,10 @@ class QuartoEnv(gym.Env):
 
     def __init__(self, render_mode=None):
         super().__init__()
+        self.screen = None
         self.render_mode = render_mode
+        if self.render_mode == "human":
+            self._init_pygame()
 
         self.phase = Phase.SELECT
         self.current_piece = np.zeros(5, dtype=np.float32)
@@ -53,8 +56,8 @@ class QuartoEnv(gym.Env):
             (0,4,8,12), (1,5,9,13), (2,6,10,14), (3,7,11,15),
             (0,5,10,15), (3,6,9,12)
         ]
+        self.is_multi_player = True
 
-        self.screen = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -66,8 +69,8 @@ class QuartoEnv(gym.Env):
         self.phase = Phase.SELECT
         self.p_counter = 16
         self.current_player = Player.PLAYER_1
-        self.agent_player = np.random.choice([Player.PLAYER_1, Player.PLAYER_2])
-        self.is_game_over = False
+        self.agent_player = Player.PLAYER_1
+        # self.agent_player = np.random.choice([Player.PLAYER_1, Player.PLAYER_2])
         return self._get_obs(), {}
 
 
@@ -81,10 +84,15 @@ class QuartoEnv(gym.Env):
             self.board[action*5:action*5+5] = self.current_piece
             self.current_piece[:] = 0
 
-            if self._check_win():
+            is_win = self._check_win()
+            if is_win and self.current_player == self.agent_player:
                 reward = 1.0
                 terminated = True
-                info["msg"] = f"Joueur {self.current_player} a gagné !"
+                info["msg"] = f"Agent a gagné !"
+            elif is_win and self.current_player != self.agent_player:
+                reward = -1.0
+                terminated = True
+                info["msg"] = f"Agent a perdu !"
             elif self.p_counter == 0:
                 terminated = True
                 info["msg"] = "Match Nul !"
@@ -99,7 +107,6 @@ class QuartoEnv(gym.Env):
             self.phase = Phase.PLACE
             self.current_player = Player.PLAYER_2 if self.current_player == Player.PLAYER_1 else Player.PLAYER_1
 
-        self.is_game_over = terminated
         return self._get_obs(), reward, terminated, truncated, info
 
 
@@ -143,7 +150,7 @@ class QuartoEnv(gym.Env):
         return self._obs_buffer
 
 
-    def _get_action_mask(self):
+    def get_action_mask(self):
         if self.phase == Phase.SELECT:
             self._action_mask_buffer[:] = self.pieces[4::5]
         else:
@@ -212,3 +219,6 @@ class QuartoEnv(gym.Env):
                             if self.pg_board[r][c].is_clicked(event):
                                 if mask[r * 4 + c] == 1:
                                     return r * 4 + c
+
+    def __str__(self):
+        return "QuartoEnv"

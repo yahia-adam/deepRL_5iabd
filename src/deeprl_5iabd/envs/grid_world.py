@@ -27,27 +27,31 @@ class GridWorldEnv(gym.Env):
     def __init__(self, render_mode=None):
         super().__init__()
         self.render_mode = render_mode
-        
+        self.screen = None
+        if self.render_mode == "human":
+            self._init_pygame()
+
+
         self.pos = 0
 
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Box(low=0, high=1, shape=(25,), dtype=np.float32)
 
+        self._action_mask_buffer = np.ones(self.action_space.n, dtype=np.float32)
+
         self.board = np.zeros(self.observation_space.shape, dtype=np.float32)
         self.board[0] = 1
 
-        self._pygame_ready = False
-
-        self.agent_player = Player.PLAYER_2
-        self.current_player = Player.PLAYER_2
-        self.screen = None
+        self.agent_player = Player.PLAYER_1
+        self.current_player = Player.PLAYER_1
+        self.is_multi_player = False
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.pos = 0
         self.board[:] = 0
         self.board[self.pos] = 1
-        return self.board, {}
+        return self._get_obs(), {}
 
     def step(self, action):
         self.board[self.pos] = 0
@@ -74,13 +78,13 @@ class GridWorldEnv(gym.Env):
             terminated = True
             reward = -1.0
 
-        return self.board, reward, terminated, truncated, {}
+        return self._get_obs(), reward, terminated, truncated, {}
 
     def render(self) -> None:
-        if not self._pygame_ready:
-            self._init_pygame()
-            self._pygame_ready = True
-        
+        if self.render_mode != "human":
+            print("render_mode is not human")
+            return
+
         self.screen.fill((30, 30, 30))
         for r in range(self.BOARD_SIZE):
             for c in range(self.BOARD_SIZE):
@@ -127,6 +131,10 @@ class GridWorldEnv(gym.Env):
 
 
     def _wait_for_human_click(self, mask=None):
+        if self.render_mode != "human":
+            print("render_mode is not human")
+            return
+
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -151,9 +159,14 @@ class GridWorldEnv(gym.Env):
             pygame.quit()
             self.screen = None
 
-    def _get_action_mask(self):
-        ## pas besoin tous est autorise just ca reste sur place
-        return
+    def _get_obs(self):
+        return self.board
+
+    def get_action_mask(self):
+        return self._action_mask_buffer
 
     def _state_id(self):
         return self.pos
+
+    def __str__(self):
+        return "GridWorldEnv"

@@ -37,6 +37,9 @@ class TicTacToeEnv(gym.Env):
         super().__init__()
 
         self.render_mode = render_mode
+        self.screen = None
+        if self.render_mode == "human":
+            self._init_pygame()
 
         self.board = np.full(9, -1, dtype=np.float32)
 
@@ -45,16 +48,16 @@ class TicTacToeEnv(gym.Env):
 
         self._obs_buffer = np.zeros(self.observation_space.shape[0], dtype=np.float32)
         self._action_mask_buffer = np.zeros(self.action_space.n, dtype=np.int8)
+        self.is_multi_player = True
 
-        self._pygame_ready = False
-        self.screen = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
         self.board[:] = -1
         self.current_player = Player.PLAYER_1
-        self.agent_player = np.random.choice([Player.PLAYER_1, Player.PLAYER_2])
+        self.agent_player = Player.PLAYER_1
+        # self.agent_player = np.random._pygame_ready([Player.PLAYER_1, Player.PLAYER_2])
         self.count_step = 0
 
         return self._get_obs(), {}
@@ -81,10 +84,6 @@ class TicTacToeEnv(gym.Env):
         if self.render_mode != "human":
             return
 
-        if not self._pygame_ready:
-            self._init_pygame()
-            self._pygame_ready = True
-
         self.screen.fill((0, 0, 0))
 
         font = pygame.font.SysFont(None, 36)
@@ -94,12 +93,13 @@ class TicTacToeEnv(gym.Env):
             for c in range(3):
                 if self.board[r * 3 + c] == Player.PLAYER_1.value:
                     self.pg_board[r][c].image = self.pg_assets[0]
-                if self.board[r * 3 + c] == Player.PLAYER_2.value:
+                elif self.board[r * 3 + c] == Player.PLAYER_2.value:
                     self.pg_board[r][c].image = self.pg_assets[1]
+                else:
+                    self.pg_board[r][c].image = None
                 self.pg_board[r][c].draw(self.screen)
 
         pygame.display.flip()
-
 
     def close(self):
         if self.screen is not None:
@@ -155,14 +155,15 @@ class TicTacToeEnv(gym.Env):
         return self._obs_buffer
 
 
-    def _get_action_mask(self):
+    def get_action_mask(self):
         return (self.board == -1).astype(np.int8)
 
 
     def _wait_for_human_click(self, mask) -> int:
-        if (self._pygame_ready == False):
-            self._init_pygame()
-            self._pygame_ready = True
+        if self.render_mode != "human":
+            print("render_mode is not human")
+            return
+
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -180,3 +181,6 @@ class TicTacToeEnv(gym.Env):
         for i, val in enumerate(encoded):
             state += val * (3 ** i)
         return state
+
+    def __str__(self):
+        return "TicTacToeEnv"

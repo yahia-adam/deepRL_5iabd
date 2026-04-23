@@ -5,7 +5,7 @@ import pickle
 
 def q_learning(
     env: Env,
-    learning_rate: float = 0.9,
+    learning_rate: float = 0.001,
     gamma: float = 0.9,
     epsilon: float = 1.0,
     epsilon_decay: float = 0.0001,
@@ -45,9 +45,9 @@ def q_learning(
         sum_rewards[t] = np.sum(reward_per_episode[max(0, t - 100):t + 1])
 
     plt.plot(sum_rewards)
-    plt.savefig("q_learning.png")
+    plt.savefig(f"q_learning_{env}.png")
 
-    with open("q_learning.pkl", "wb") as f:
+    with open(f"q_learning_{env}.pkl", "wb") as f:
         pickle.dump(Q, f)
     env.close()
 
@@ -72,7 +72,7 @@ def q_learning_tictactoe(
         truncated = False
 
         while not terminated and not truncated:
-            mask = env._get_action_mask()
+            mask = env.get_action_mask()
             valid_actions = np.where(mask == 1)[0]
 
             if env.current_player == agent_player:
@@ -107,8 +107,8 @@ def q_learning_tictactoe(
         sum_rewards[t] = np.sum(reward_per_episode[max(0, t - 100):t + 1])
 
     plt.plot(sum_rewards)
-    plt.savefig("q_learning_tictactoe.png")
+    plt.savefig(f"q_learning_{env}.png")
 
-    with open("q_learning_tictactoe.pkl", "wb") as f:
+    with open(f"q_learning_{env}.pkl", "wb") as f:
         pickle.dump(Q, f)
     env.close()

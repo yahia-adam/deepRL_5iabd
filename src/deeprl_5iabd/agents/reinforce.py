@@ -1,9 +1,10 @@
+import time
+import torch
 import pickle
 import numpy as np
-import gymnasium as gym
-import torch
-from torch import optim
 import torch.nn as nn
+import gymnasium as gym
+from torch import optim
 from torch.distributions import Categorical
 import matplotlib.pyplot as plt
 from deeprl_5iabd.agents.random_agent import RandomPlayer
@@ -11,7 +12,7 @@ from deeprl_5iabd.helper import Player, softmax_with_mask
 from deeprl_5iabd.envs.line_world import LineWorldEnv
 from deeprl_5iabd.envs.tictactoe import TicTacToeEnv
 from deeprl_5iabd.envs.grid_world import GridWorldEnv
-from deeprl_5iabd.envs.quarto import QuartoEnv
+from deeprl_5iabd.envs.quarto import QuartoEnv, Phase
 
 
 class ReinforceAgent(nn.Module):
@@ -23,7 +24,7 @@ class ReinforceAgent(nn.Module):
             nn.Linear(120, 84),
             nn.ReLU(),
             nn.Linear(84, env.action_space.n),
-        )
+        )  
 
     def forward(self, x, mask):
         x = self.network(x)
@@ -62,12 +63,15 @@ class Critic(nn.Module):
 
 def reinforce(
     env: gym.Env,
-    reinforce_agent: ReinforceAgent,
+    reinforce_agent: ReinforceAgent = None,
     num_episodes: int = 10_000,
     lr: float = 0.001,
     gamma: float = 0.99,
-    env_name: str = "tictactoe",
+    with_baseline: bool = True,
 ):
+    if reinforce_agent is None:
+        reinforce_agent = ReinforceAgent(env)
+
     optimizer = optim.Adam(reinforce_agent.parameters(), lr=lr)
     reward_per_episode = np.zeros(num_episodes)
     loss_per_episode = np.zeros(num_episodes)
@@ -80,9 +84,78 @@ def reinforce(
         truncated = False
 
         while not terminated and not truncated:
-            mask = env._get_action_mask()
+            mask = env.get_action_mask()
+            
+            # env.render()
+            # time.sleep(2)
 
-            if env.current_player == env.agent_player:
+            if isinstance(env, QuartoEnv):
+                # Phase PLACE : l'agent place la pièce qu'il a reçue
+                if env.phase == Phase.PLACE:
+                    action_probs = reinforce_agent.forward(torch.tensor(state).float(), mask)
+                    probs_dist = Categorical(action_probs)
+                    action = probs_dist.sample()
+                    log_probs.append(probs_dist.log_prob(action))
+                    
+                    new_state, reward, terminated, truncated, _ = env.step(action.item())
+                    state = new_state
+                    rewards.append(reward)
+                    
+                    if terminated or truncated:
+                        break
+
+                    # Après PLACE vient SELECT
+                    mask = env.get_action_mask()
+                    # env.render()
+                    # print("agent place")
+                    # time.sleep(2)
+                    
+
+                # Phase SELECT : l'agent choisit la pièce à donner
+                # (on passe ici directement après PLACE, ou si on commence en SELECT)
+                if env.phase == Phase.SELECT:
+                    action_probs = reinforce_agent.forward(torch.tensor(state).float(), mask)
+                    probs_dist = Categorical(action_probs)
+                    action = probs_dist.sample()
+                    log_probs.append(probs_dist.log_prob(action))
+                    
+                    new_state, reward, terminated, truncated, _ = env.step(action.item())
+                    state = new_state
+                    rewards.append(reward)
+                    
+                    if terminated or truncated:
+                        break
+                    # env.render()
+                    # print("agent select")
+                    # time.sleep(2)
+
+
+                    # Maintenant c'est au tour de l'adversaire (PLACE + SELECT)
+                    # PLACE adverse
+                    mask = env.get_action_mask()
+                    adv_action = env.action_space.sample(mask=mask)
+                    new_state, reward, terminated, truncated, _ = env.step(adv_action)
+                    state = new_state
+                    
+                    # env.render()
+                    # print("adversaire place")
+                    # time.sleep(2)
+
+                    if terminated or truncated:
+                        rewards[-1] = reward  # patch le reward avec le résultat final
+                        break
+
+                    # SELECT adverse
+                    mask = env.get_action_mask()
+                    adv_action = env.action_space.sample(mask=mask)
+                    new_state, reward, terminated, truncated, _ = env.step(adv_action)
+                    state = new_state
+                    
+                    # env.render()
+                    # print("adversaire select")
+                    # time.sleep(2)
+
+            elif isinstance(env, TicTacToeEnv):
                 action_probs = reinforce_agent.forward(
                     torch.tensor(state).float(), mask
                 )
@@ -90,13 +163,37 @@ def reinforce(
                 action = probs_dist.sample()
 
                 new_state, reward, terminated, truncated, _ = env.step(action.item())
+                log_probs.append(probs_dist.log_prob(action))
 
+                if not terminated and not truncated:
+                    mask = env.get_action_mask()
+                    action = env.action_space.sample(mask=mask)
+                    new_state, reward, terminated, truncated, _ = env.step(action)
+
+                    rewards.append(reward)
+                else:
+                    rewards.append(reward)
+
+            else:
+                action_probs = reinforce_agent.forward(
+                    torch.tensor(state).float(), mask
+                )
+                probs_dist = Categorical(action_probs)
+                action = probs_dist.sample()
+
+                new_state, reward, terminated, truncated, _ = env.step(action.item())
                 log_probs.append(probs_dist.log_prob(action))
                 rewards.append(reward)
-            else:
-                new_state, _, terminated, truncated, _ = env.step(env.action_space.sample(mask=mask))
 
             state = new_state
+
+        ## debug
+        # env.render()
+        # time.sleep(5)
+
+        ## debug
+        # print(f"rewards : {sum(rewards)}")
+        # print(f"reward : {reward}")
 
         reward_per_episode[epoch] = np.sum(rewards)
 
@@ -107,6 +204,10 @@ def reinforce(
             returns.insert(0, G)
 
         returns = torch.tensor(returns).float()
+
+        if with_baseline:
+            if len(returns) > 1:
+                returns = (returns - returns.mean()) / (returns.std() + 1e-8)
 
         loss = torch.stack([-lp * G for lp, G in zip(log_probs, returns)]).sum()
 
@@ -122,26 +223,34 @@ def reinforce(
             losses = np.sum(recent == -1) / len(recent) * 100
             print(f"Episode {epoch}: W={wins:.0f}% L={losses:.0f}% | Loss = {loss_per_episode[epoch]:.4f}")
 
+
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
-    sum_rewards = np.zeros(num_episodes)
+    wins_rate = np.zeros(num_episodes)
+    losses_rate = np.zeros(num_episodes)
+
     for t in range(num_episodes):
-        sum_rewards[t] = np.mean(reward_per_episode[max(0, t - 100):t + 1])
+        recent = reward_per_episode[max(0, t - 100):t + 1]
+        wins_rate[t] = np.sum(recent == 1) / len(recent) * 100
+        losses_rate[t] = np.sum(recent == -1) / len(recent) * 100
 
-    ax1.plot(sum_rewards)
+    ax1.plot(wins_rate, label="Victoires %", color="green")
+    ax1.plot(losses_rate, label="Défaites %", color="red")
     ax1.set_xlabel("Épisode")
-    ax1.set_ylabel("Reward moyen (100 épisodes)")
-    ax1.set_title(f"REINFORCE - {env_name}")
+    ax1.set_ylabel("% sur 100 épisodes")
+    ax1.set_title(f"REINFORCE - {env} | Win/Loss rate")
+    ax1.legend()
 
-    ax2.plot(loss_per_episode)
+    ax2.plot(loss_per_episode, label="Loss")
     ax2.set_xlabel("Épisode")
     ax2.set_ylabel("Loss")
-    ax2.set_title("Loss par épisode")
+    ax2.set_title("Loss de l'algo")
+    ax2.legend()
 
     plt.tight_layout()
-    plt.savefig(f"reinforce_{env_name}.png")
+    plt.savefig(f"reinforce_baseline_{with_baseline}_{env}.png")
 
-    with open(f"reinforce_{env_name}.pkl", "wb") as f:
+    with open(f"reinforce_baseline_{with_baseline}_{env}.pkl", "wb") as f:
         pickle.dump(reinforce_agent, f)
 
     env.close()
@@ -169,7 +278,7 @@ def reinforce_mean_baseline(
         truncated = False
 
         while not terminated and not truncated:
-            mask = env._get_action_mask()
+            mask = env.get_action_mask()
 
             if env.current_player == env.agent_player:
                 action_probs = reinforce_agent.forward(
@@ -265,7 +374,7 @@ def reinforce_critic_baseline(
         truncated = False
 
         while not terminated and not truncated:
-            mask = env._get_action_mask()
+            mask = env.get_action_mask()
 
             if env.current_player == env.agent_player:
                 state_tensor = torch.tensor(state).float()
@@ -359,60 +468,3 @@ def reinforce_critic_baseline(
 
     env.close()
     return actor, critic
-
-if __name__ == "__main__":
-    # # reinforce
-    # env = LineWorldEnv()
-    # agent = ReinforceAgent(env)
-    # reinforce(env, agent, num_episodes=1000, env_name="line_world")
-
-    # env = GridWorldEnv()
-    # agent = ReinforceAgent(env)
-    # reinforce(env, agent, env_name="grid_world")
-
-    # env = TicTacToeEnv()
-    # agent = ReinforceAgent(env)
-    # reinforce(env, agent)
-
-    # env = QuartoEnv()
-    # agent = ReinforceAgent(env)
-    # reinforce(env, agent, env_name="quarto")
-
-    
-    # # reinforce mean baseline
-    # env = LineWorldEnv()
-    # agent = ReinforceAgent(env)
-    # reinforce_mean_baseline(env, agent, num_episodes=1000, env_name="line_world")
-
-    # env = GridWorldEnv()
-    # agent = ReinforceAgent(env)
-    # reinforce_mean_baseline(env, agent, env_name="grid_world")
-
-    # env = TicTacToeEnv()
-    # agent = ReinforceAgent(env)
-    # reinforce_mean_baseline(env, agent)
-
-    # env = QuartoEnv()
-    # agent = ReinforceAgent(env)
-    # reinforce_mean_baseline(env, agent, env_name="quarto")
-
-    # reinforce critic baseline
-    # env = LineWorldEnv()
-    # actor = Actor(env)
-    # critic = Critic(env)
-    # reinforce_critic_baseline(env, actor, critic, env_name="line_world", num_episodes=1000)
-
-    # env = GridWorldEnv()
-    # actor = Actor(env)
-    # critic = Critic(env)
-    # reinforce_critic_baseline(env, actor, critic, env_name="grid_world", num_episodes=1000)
-
-    # env = TicTacToeEnv()
-    # actor = Actor(env)
-    # critic = Critic(env)
-    # reinforce_critic_baseline(env, actor, critic)
-
-    env = QuartoEnv()
-    actor = Actor(env)
-    critic = Critic(env)
-    reinforce_critic_baseline(env, actor, critic, env_name="quarto")

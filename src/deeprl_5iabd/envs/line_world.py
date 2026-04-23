@@ -26,16 +26,21 @@ class LineWorldEnv(gym.Env):
     def __init__(self, render_mode=None):
         super().__init__()
         self.render_mode = render_mode
+        self.screen = None
+        if self.render_mode == "human":
+            self._init_pygame()
 
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(5,), dtype=np.float32)
         self.action_space = spaces.Discrete(2)
 
+
+        self._action_mask_buffer = np.ones(self.action_space.n, dtype=np.float32)
+
         self.board = np.zeros(self.observation_space.shape[0], dtype=np.float32)
-        self._pygame_initialized = False
 
         self.current_player = Player.PLAYER_1
         self.agent_player = Player.PLAYER_1
-        self.screen = None
+        self.is_multi_player = False
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -43,7 +48,7 @@ class LineWorldEnv(gym.Env):
         self.board[:] = 0
         self.agent_pos = 2
         self.board[self.agent_pos] = 1
-        return self.board, {}
+        return self._get_obs(), {}
 
     def step(self, action):
         self.board[self.agent_pos] = 0
@@ -63,11 +68,12 @@ class LineWorldEnv(gym.Env):
         else:
             reward = 0.0
 
-        return self.board, reward, terminated, False, {}
+        return self._get_obs(), reward, terminated, False, {}
 
     def render(self) -> None:
-        if not self._pygame_initialized:
-            self._init_pygame()
+        if self.render_mode != "human":
+            print("render_mode is not human")
+            return
 
         self.screen.fill((30, 30, 30))
 
@@ -86,16 +92,22 @@ class LineWorldEnv(gym.Env):
     def _state_id(self):
         return self.agent_pos
 
-    def _get_action_mask(self):
-        # rien a return
-        return
+    def get_action_mask(self):
+        return self._action_mask_buffer
+        
+    def _get_obs(self):
+        return self.board
 
     def _init_pygame(self):
+        if self.render_mode != "human":
+            print("render_mode is not human")
+            return
+
         pygame.init()
         self.last_action = 1
         self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        print("init pygame")
         pygame.display.set_caption("LineWorld")
-        self._pygame_initialized = True
 
         self.pg_assets = [
             pygame.transform.scale(
@@ -114,6 +126,10 @@ class LineWorldEnv(gym.Env):
         self.pg_board[4].score_color = (0, 255, 0)
 
     def _wait_for_human_click(self, mask=None):
+        if self.render_mode != "human":
+            print("render_mode is not human")
+            return
+
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -125,3 +141,6 @@ class LineWorldEnv(gym.Env):
                     elif event.key == pygame.K_RIGHT:
                         self.last_action = Action.RIGHT
                         return Action.RIGHT.value
+
+    def __str__(self):
+        return "LineWorldEnv"

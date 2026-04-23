@@ -53,6 +53,7 @@ coverage.xml
 *.cover
 *.py.cover
 .hypothesis/
+CLAUDE.md
 .pytest_cache/
 cover/
 
