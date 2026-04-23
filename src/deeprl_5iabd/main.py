@@ -1,8 +1,9 @@
-from deeprl_5iabd.config import settings
 import time
 import click
+import pickle
 import importlib
 from gymnasium.wrappers import RecordVideo
+from deeprl_5iabd.config import settings
 
 ENV_MAP = {
     "quarto":    ("deeprl_5iabd.envs.quarto",     "QuartoEnv"),
@@ -97,32 +98,71 @@ def train(env: str, algo: str, episodes: int, record: bool, record_every: int | 
 
 @cli.command()
 @click.argument("env", type=ENV_CHOICES)
-def play(env: str):
-    """Human vs Random en mode graphique (parties en boucle, Ctrl+C pour quitter)."""
-    environment = load_env(env, render_mode="human")
-    while True:
+@click.option("--mode", type=click.Choice(["hvr", "rvm", "mvm"]), default="hvr",
+              help="hvr=Human vs Random, rvm=Random vs Model, mvm=Model vs Model")
+@click.option("--model", "model_path", type=click.Path(exists=True), default=None,
+              help="Path to .pkl model (required for rvm/mvm)")
+@click.option("--model2", "model2_path", type=click.Path(exists=True), default=None,
+              help="Path to second .pkl model (optional for mvm, else same as --model)")
+@click.option("--delay", type=float, default=0.5,
+              help="Delay (s) between AI moves for visibility (default 0.5)")
+def play(env: str, mode: str, model_path: str | None, model2_path: str | None, delay: float):
+    """Parties en boucle avec rendu graphique. Ctrl+C pour quitter."""
 
-        done = False
+    def load_model(path):
+        with open(path, "rb") as f:
+            return pickle.load(f)
+
+    if mode in ("rvm", "mvm") and not model_path:
+        raise click.UsageError(f"--model is required for mode '{mode}'")
+    if mode == "mvm" and not model2_path:
+        model2_path = model_path
+
+    model = load_model(model_path) if model_path else None
+    model2 = load_model(model2_path) if model2_path else None
+
+    environment = load_env(env, render_mode="human")
+
+    if not environment.is_multi_player:
+        solo_agent = "human" if mode == "hvr" else model
+    else:
+        agents = {
+            "hvr": ("human", "random"),
+            "rvm": ("random", model),
+            "mvm": (model, model2),
+        }
+        agent_p0, agent_p1 = agents[mode]
+
+    def pick_action(agent, mask):
+        if agent == "human":
+            return environment._wait_for_human_click(mask)
+        if agent == "random":
+            time.sleep(delay)
+            return environment.action_space.sample(mask=mask)
+        time.sleep(delay)
+        return agent.choose_action(environment, mask)
+
+    while True:
         environment.reset()
+        done = False
 
         while not done:
             environment.render()
             mask = environment.get_action_mask()
+
             if environment.is_multi_player:
-
-                if (environment.current_player == environment.agent_player):
-                    action = environment.action_space.sample(mask=mask)
-                else:
-                    action = environment._wait_for_human_click(mask)
-
+                agent = agent_p1 if environment.current_player == environment.agent_player else agent_p0
             else:
+                agent = solo_agent
 
-                action = environment._wait_for_human_click(mask)
-
+            action = pick_action(agent, mask)
             _, reward, terminated, truncated, _ = environment.step(action)
             done = terminated or truncated
-            print(f"reward : {reward}")
+            print(f"reward: {reward}")
 
-
+        # Pause entre les parties pour voir le résultat final
+        environment.render()
+        time.sleep(delay * 3)
+    
 if __name__ == "__main__":
     cli()
