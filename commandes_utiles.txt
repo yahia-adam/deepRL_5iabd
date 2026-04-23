@@ -1,0 +1,14 @@
+# Pull main
+
+git push
+
+git checkout main
+
+git pull
+
+git checkout Tom
+
+git merge main
+
+
+cd /home/torel/Projects/deepRL_5iabd && PYTHONPATH=. uv run src/training/line_world_q_learning.py
