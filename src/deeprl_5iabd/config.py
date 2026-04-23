@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     debug_mode: bool = False
     device: str = Field(default_factory=get_default_device)
 
-    models_dir: str = "experimentation_logs/models"
     training_logs_dir: str = "experimentation_logs/train_logs"
+    models_dir: str = "experimentation_logs/models_logs"
     videos_dir: str = "experimentation_logs/videos_logs"
 
     line_world_assets_dir: str = "game_assets/line_world/v2"

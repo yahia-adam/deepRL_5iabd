@@ -114,8 +114,13 @@ def q_learning_tictactoe(
         sum_rewards[t] = np.sum(reward_per_episode[max(0, t - 100):t + 1])
 
     plt.plot(sum_rewards)
-    plt.savefig(f"q_learning_{env}.png")
+    save_dir = f"{settings.training_logs_path}/q_learning_tictactoe/"
+    os.makedirs(save_dir, exist_ok=True)
+    plt.savefig(f"{save_dir}/plot_reward.png")
 
-    with open(f"q_learning_{env}.pkl", "wb") as f:
+    model_dir = f"{settings.models_path}/q_learning_tictactoe/"
+    os.makedirs(model_dir, exist_ok=True)
+    with open(f"{model_dir}/model.pkl", "wb") as f:
         pickle.dump(Q, f)
+
     env.close()

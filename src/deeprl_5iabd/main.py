@@ -73,16 +73,25 @@ def train(env: str, algo: str, episodes: int, record: bool, record_every: int | 
         _environment = load_env(env, render_mode="rgb_array")
         environment = RecordVideo(
             _environment,
-            video_folder=f"{settings.videos_dir}/{env}/{algo}",
+            video_folder=f"{settings.videos_dir}/{algo}/{env}",
             episode_trigger=lambda ep: ep % every == 0,
         )
         environment.state_id = _environment.state_id
         environment.get_action_mask = _environment.get_action_mask
-        click.echo(f"Recording every {every} episodes → {settings.videos_dir}/{env}/{algo}")
+        environment.agent_player = _environment.agent_player
+        type(environment).current_player = property(
+            lambda self: _environment.current_player,
+            lambda self, v: setattr(_environment, 'current_player', v)
+        )
+        click.echo(f"Recording every {every} episodes → {settings.videos_dir}/{algo}/{env}")
     else:
         environment = load_env(env)
- 
-    fn = load_algo(algo)
+
+    if algo == "q_learning" and env == "tictactoe":
+        fn = load_algo("q_learning_tictactoe")
+    else:
+        fn = load_algo(algo)
+
     fn(environment, num_episodes=episodes)
     environment.close()
 

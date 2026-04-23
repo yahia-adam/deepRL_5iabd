@@ -46,14 +46,15 @@ class TicTacToeEnv(gym.Env):
 
         self._obs_buffer = np.zeros(self.observation_space.shape[0], dtype=np.float32)
         self._action_mask_buffer = np.zeros(self.action_space.n, dtype=np.int8)
+
+        self.current_player = Player.PLAYER_1
+        self.agent_player = Player.PLAYER_1
         self.is_multi_player = True
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
         self.board[:] = -1
-        self.current_player = Player.PLAYER_1
-        self.agent_player = Player.PLAYER_1
         self.count_step = 0
 
         return self._get_obs(), {}
