@@ -1,7 +1,8 @@
+from deeprl_5iabd.config import settings
 import time
 import click
 import importlib
-
+from gymnasium.wrappers import RecordVideo
 
 ENV_MAP = {
     "quarto":    ("deeprl_5iabd.envs.quarto",     "QuartoEnv"),
@@ -63,12 +64,27 @@ def load_algo(name: str):
 @click.argument("env",  type=ENV_CHOICES)
 @click.argument("algo", type=ALGO_CHOICES)
 @click.option("--episodes", "-n", default=10_000, show_default=True, help="Nombre d'épisodes.")
-def train(env: str, algo: str, episodes: int):
-    """Entraînement : ENV ALGO [--episodes N]."""
-    environment = load_env(env)
-    fn = load_algo(algo, )
+@click.option("--record", "-r", is_flag=True, default=False, help="Enregistrer des épisodes en vidéo.")
+@click.option("--record-every", default=None, type=int, help="Enregistrer tous les N épisodes. Par défaut: 10 vidéos réparties sur le training.")
+def train(env: str, algo: str, episodes: int, record: bool, record_every: int | None):
+    """Entraînement : ENV ALGO [--episodes N] [--record] [--record-every N]."""
+    if record:
+        every = record_every or max(1, episodes // 10)
+        _environment = load_env(env, render_mode="rgb_array")
+        environment = RecordVideo(
+            _environment,
+            video_folder=f"{settings.videos_dir}/{env}/{algo}",
+            episode_trigger=lambda ep: ep % every == 0,
+        )
+        environment.state_id = _environment.state_id
+        environment.get_action_mask = _environment.get_action_mask
+        click.echo(f"Recording every {every} episodes → {settings.videos_dir}/{env}/{algo}")
+    else:
+        environment = load_env(env)
+ 
+    fn = load_algo(algo)
     fn(environment, num_episodes=episodes)
-
+    environment.close()
 
 @cli.command()
 @click.argument("env", type=ENV_CHOICES)
@@ -79,11 +95,10 @@ def play(env: str):
 
         done = False
         environment.reset()
+
         while not done:
             environment.render()
             mask = environment.get_action_mask()
-            print(mask)
-    
             if environment.is_multi_player:
 
                 if (environment.current_player == environment.agent_player):

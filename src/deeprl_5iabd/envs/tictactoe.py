@@ -7,21 +7,15 @@ from deeprl_5iabd.helper import Player
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
 
-class TicTacToeEnv(gym.Env):
-    """
-    Environnement TicTacToe (Morpion 3x3).
-    - Joueur 0 (O) : commence, cherche à maximiser (récompense +1.0 si victoire)
-    - Joueur 1 (X) : cherche à minimiser (récompense -1.0 si victoire)
-    - Match nul : récompense 0.0
-    - Grille vide = -1
-    """
-    metadata = {"render_modes": ["human"], "render_fps": 30}
 
-    # Combinaisons gagnantes pré-calculées pour des perfs maximales
+class TicTacToeEnv(gym.Env):
+
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
+
     WIN_PATTERNS = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8], # Lignes
-        [0, 3, 6], [1, 4, 7], [2, 5, 8], # Colonnes
-        [0, 4, 8], [2, 4, 6]             # Diagonales
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
     ]
     BOARD_SIZE = 3
 
@@ -38,18 +32,21 @@ class TicTacToeEnv(gym.Env):
 
         self.render_mode = render_mode
         self.screen = None
+        self._offscreen = None
+
         if self.render_mode == "human":
             self._init_pygame()
+        elif self.render_mode == "rgb_array":
+            self._init_offscreen()
 
         self.board = np.full(9, -1, dtype=np.float32)
 
-        self.action_space = spaces.Discrete(len(self.board), dtype=np.int8) 
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(1+len(self.board),), dtype=np.float32)
+        self.action_space = spaces.Discrete(len(self.board), dtype=np.int8)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(1 + len(self.board),), dtype=np.float32)
 
         self._obs_buffer = np.zeros(self.observation_space.shape[0], dtype=np.float32)
         self._action_mask_buffer = np.zeros(self.action_space.n, dtype=np.int8)
         self.is_multi_player = True
-
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -57,7 +54,6 @@ class TicTacToeEnv(gym.Env):
         self.board[:] = -1
         self.current_player = Player.PLAYER_1
         self.agent_player = Player.PLAYER_1
-        # self.agent_player = np.random._pygame_ready([Player.PLAYER_1, Player.PLAYER_2])
         self.count_step = 0
 
         return self._get_obs(), {}
@@ -80,14 +76,15 @@ class TicTacToeEnv(gym.Env):
         self.current_player = Player.PLAYER_2 if self.current_player == Player.PLAYER_1 else Player.PLAYER_1
         return self._get_obs(), reward, terminated, False, {}
 
-    def render(self) -> None:
-        if self.render_mode != "human":
+    def render(self):
+        if self.render_mode not in ("human", "rgb_array"):
             return
 
-        self.screen.fill((0, 0, 0))
+        surface = self.screen if self.render_mode == "human" else self._offscreen
+        surface.fill((0, 0, 0))
 
         font = pygame.font.SysFont(None, 36)
-        self.screen.blit(font.render(f"Joueur {self.current_player} jouer", True, (255, 255, 255)), (10, 10))
+        surface.blit(font.render(f"Joueur {self.current_player} jouer", True, (255, 255, 255)), (10, 10))
 
         for r in range(3):
             for c in range(3):
@@ -97,35 +94,27 @@ class TicTacToeEnv(gym.Env):
                     self.pg_board[r][c].image = self.pg_assets[1]
                 else:
                     self.pg_board[r][c].image = None
-                self.pg_board[r][c].draw(self.screen)
+                self.pg_board[r][c].draw(surface)
 
-        pygame.display.flip()
+        if self.render_mode == "human":
+            pygame.display.flip()
+        else:
+            return np.transpose(pygame.surfarray.array3d(surface), (1, 0, 2))
 
     def close(self):
-        if self.screen is not None:
+        if self.screen is not None or self._offscreen is not None:
             pygame.quit()
             self.screen = None
+            self._offscreen = None
 
-    def _init_pygame(self) -> None:
-        pygame.init()
-
-        self.screen = pygame.display.set_mode(
-            (self.PG_WINDOW_W, self.PG_WINDOW_H)
-        )
-
-        pygame.display.set_caption("TicTacToe")
-
+    def _init_assets(self):
         self.pg_assets = [
             pygame.transform.scale(
-                pygame.image.load(
-                    f"{settings.tictactoe_assets_path}/0.png"
-                ),
+                pygame.image.load(f"{settings.tictactoe_assets_path}/0.png"),
                 (self.PG_PIECE_W, self.PG_PIECE_H),
             ),
             pygame.transform.scale(
-                pygame.image.load(
-                    f"{settings.tictactoe_assets_path}/1.png"
-                ),
+                pygame.image.load(f"{settings.tictactoe_assets_path}/1.png"),
                 (self.PG_PIECE_W, self.PG_PIECE_H),
             ),
         ]
@@ -143,6 +132,16 @@ class TicTacToeEnv(gym.Env):
             for r in range(3)
         ]
 
+    def _init_pygame(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        pygame.display.set_caption("TicTacToe")
+        self._init_assets()
+
+    def _init_offscreen(self):
+        pygame.init()
+        self._offscreen = pygame.Surface((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        self._init_assets()
 
     def _check_win(self):
         for p in self.WIN_PATTERNS:
@@ -154,14 +153,11 @@ class TicTacToeEnv(gym.Env):
         np.concatenate(([self.current_player], self.board), out=self._obs_buffer)
         return self._obs_buffer
 
-
     def get_action_mask(self):
         return (self.board == -1).astype(np.int8)
 
-
     def _wait_for_human_click(self, mask) -> int:
         if self.render_mode != "human":
-            print("render_mode is not human")
             return
 
         while True:
@@ -175,7 +171,7 @@ class TicTacToeEnv(gym.Env):
                             if mask[r * 3 + c] == 1:
                                 return r * 3 + c
 
-    def _state_id(self) -> int:
+    def state_id(self) -> int:
         encoded = (self.board + 1).astype(int)
         state = 0
         for i, val in enumerate(encoded):

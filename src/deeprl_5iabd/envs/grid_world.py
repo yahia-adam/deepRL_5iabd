@@ -8,13 +8,18 @@ from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
 from enum import IntEnum
 
+
 class Action(IntEnum):
     UP = 0
     DOWN = 1
     LEFT = 2
     RIGHT = 3
 
+
 class GridWorldEnv(gym.Env):
+
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
+
     BOARD_SIZE = 5
 
     PG_PIECE_W = 150
@@ -28,9 +33,13 @@ class GridWorldEnv(gym.Env):
         super().__init__()
         self.render_mode = render_mode
         self.screen = None
+        self._offscreen = None
+        self.last_action = Action.DOWN
+
         if self.render_mode == "human":
             self._init_pygame()
-
+        elif self.render_mode == "rgb_array":
+            self._init_offscreen()
 
         self.pos = 0
 
@@ -80,33 +89,45 @@ class GridWorldEnv(gym.Env):
 
         return self._get_obs(), reward, terminated, truncated, {}
 
-    def render(self) -> None:
-        if self.render_mode != "human":
-            print("render_mode is not human")
+    def render(self):
+        if self.render_mode not in ("human", "rgb_array"):
             return
 
-        self.screen.fill((30, 30, 30))
+        surface = self.screen if self.render_mode == "human" else self._offscreen
+        surface.fill((30, 30, 30))
+
         for r in range(self.BOARD_SIZE):
             for c in range(self.BOARD_SIZE):
                 if self.board[r * self.BOARD_SIZE + c] == 1:
                     self.pg_board[r][c].image = self.pg_assets[self.last_action.value]
                 else:
                     self.pg_board[r][c].image = None
-                self.pg_board[r][c].draw(self.screen)
-        pygame.display.flip()
+                self.pg_board[r][c].draw(surface)
 
+        if self.render_mode == "human":
+            pygame.display.flip()
+        else:
+            return np.transpose(pygame.surfarray.array3d(surface), (1, 0, 2))
 
-    def _init_pygame(self) -> None:
-        pygame.init()
-        self.last_action = Action.DOWN
-        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
-        pygame.display.set_caption("GridWorld")
+    def close(self):
+        if self.screen is not None or self._offscreen is not None:
+            pygame.quit()
+            self.screen = None
+            self._offscreen = None
 
+    def get_action_mask(self):
+        return self._action_mask_buffer
+
+    def _get_obs(self):
+        return self.board
+
+    def state_id(self):
+        return self.pos
+
+    def _init_assets(self):
         self.pg_assets = [
             pygame.transform.scale(
-                pygame.image.load(
-                    f"{settings.grid_world_assets_path}/{i}.png"
-                ),
+                pygame.image.load(f"{settings.grid_world_assets_path}/{i}.png"),
                 (self.PG_PIECE_W, self.PG_PIECE_H),
             )
             for i in range(0, 4)
@@ -123,16 +144,24 @@ class GridWorldEnv(gym.Env):
             ]
             for r in range(self.BOARD_SIZE)
         ]
-
         self.pg_board[0][4].score_text = str(-1)
         self.pg_board[0][4].score_color = (255, 0, 0)
         self.pg_board[4][4].score_text = str(1)
         self.pg_board[4][4].score_color = (0, 255, 0)
 
+    def _init_pygame(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        pygame.display.set_caption("GridWorld")
+        self._init_assets()
+
+    def _init_offscreen(self):
+        pygame.init()
+        self._offscreen = pygame.Surface((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        self._init_assets()
 
     def _wait_for_human_click(self, mask=None):
         if self.render_mode != "human":
-            print("render_mode is not human")
             return
 
         while True:
@@ -152,21 +181,6 @@ class GridWorldEnv(gym.Env):
                     elif event.key == pygame.K_DOWN:
                         self.last_action = Action.DOWN
                         return Action.DOWN.value
-
-
-    def close(self):
-        if self.screen is not None:
-            pygame.quit()
-            self.screen = None
-
-    def _get_obs(self):
-        return self.board
-
-    def get_action_mask(self):
-        return self._action_mask_buffer
-
-    def _state_id(self):
-        return self.pos
 
     def __str__(self):
         return "GridWorldEnv"

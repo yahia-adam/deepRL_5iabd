@@ -9,9 +9,11 @@ from deeprl_5iabd.config import settings
 from enum import IntEnum
 from deeprl_5iabd.helper import Player
 
+
 class Phase(IntEnum):
     SELECT = 0
     PLACE  = 1
+
 
 class QuartoEnv(gym.Env):
     BOARD_SIZE    = 4
@@ -24,12 +26,18 @@ class QuartoEnv(gym.Env):
     PG_WINDOW_W   = (PG_PIECE_W + PG_GAP) * (BOARD_SIZE * 2) + PG_PIECE_W
     PG_WINDOW_H   = (PG_PIECE_H + PG_GAP) * BOARD_SIZE + PG_PIECE_H
 
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
+
     def __init__(self, render_mode=None):
         super().__init__()
         self.screen = None
+        self._offscreen = None
         self.render_mode = render_mode
+
         if self.render_mode == "human":
             self._init_pygame()
+        elif self.render_mode == "rgb_array":
+            self._init_offscreen()
 
         self.phase = Phase.SELECT
         self.current_piece = np.zeros(5, dtype=np.float32)
@@ -50,14 +58,12 @@ class QuartoEnv(gym.Env):
 
         self._obs_buffer = np.zeros(self.observation_space.shape[0], dtype=np.float32)
         self._action_mask_buffer = np.zeros(self.action_space.n, dtype=np.int8)
-        self._pygame_ready = False
         self._win_lines = [
             (0,1,2,3), (4,5,6,7), (8,9,10,11), (12,13,14,15),
             (0,4,8,12), (1,5,9,13), (2,6,10,14), (3,7,11,15),
             (0,5,10,15), (3,6,9,12)
         ]
         self.is_multi_player = True
-
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -70,9 +76,7 @@ class QuartoEnv(gym.Env):
         self.p_counter = 16
         self.current_player = Player.PLAYER_1
         self.agent_player = Player.PLAYER_1
-        # self.agent_player = np.random.choice([Player.PLAYER_1, Player.PLAYER_2])
         return self._get_obs(), {}
-
 
     def step(self, action):
         reward = 0.0
@@ -109,15 +113,12 @@ class QuartoEnv(gym.Env):
 
         return self._get_obs(), reward, terminated, truncated, info
 
+    def render(self):
+        if self.render_mode not in ("human", "rgb_array"):
+            return
 
-    def render(self) -> None:
-        if self.render_mode != "human": return
-        
-        if not self._pygame_ready:
-            self._init_pygame()
-            self._pygame_ready = True
-
-        self.screen.fill((0, 0, 0))
+        surface = self.screen if self.render_mode == "human" else self._offscreen
+        surface.fill((0, 0, 0))
 
         font = pygame.font.SysFont(None, 36)
         phase_label = {
@@ -125,29 +126,28 @@ class QuartoEnv(gym.Env):
             Phase.PLACE:  "placez la pièce",
         }.get(self.phase, "Fin de partie")
 
-        self.screen.blit(font.render(f"Joueur {self.current_player.value} — {phase_label}", True, (255, 255, 255)), (10, 10))
+        surface.blit(font.render(f"Joueur {self.current_player.value} — {phase_label}", True, (255, 255, 255)), (10, 10))
 
         for r in range(4):
             for c in range(4):
                 self.pg_board[r][c].image  = self._asset(self.board[(r*4+c)*5 : (r*4+c)*5+5])
                 self.pg_pieces[r][c].image = self._asset(self.pieces[(r*4+c)*5 : (r*4+c)*5+5])
-                self.pg_board[r][c].draw(self.screen)
-                self.pg_pieces[r][c].draw(self.screen)
+                self.pg_board[r][c].draw(surface)
+                self.pg_pieces[r][c].draw(surface)
 
         self.pg_selected.image = self._asset(self.current_piece[:5])
-        self.pg_selected.draw(self.screen)
-        pygame.display.flip()
+        self.pg_selected.draw(surface)
 
+        if self.render_mode == "human":
+            pygame.display.flip()
+        else:
+            return np.transpose(pygame.surfarray.array3d(surface), (1, 0, 2))
 
     def close(self):
-        if self.screen is not None:
+        if self.screen is not None or self._offscreen is not None:
             pygame.quit()
             self.screen = None
-
-
-    def _get_obs(self):
-        np.concatenate(([self.phase.value], self.current_piece, self.board, self.pieces), out=self._obs_buffer)
-        return self._obs_buffer
+            self._offscreen = None
 
 
     def get_action_mask(self):
@@ -157,6 +157,12 @@ class QuartoEnv(gym.Env):
             self._action_mask_buffer[:] = (self.board[4::5] == 0).astype(np.int8)
         return self._action_mask_buffer
 
+    def _get_obs(self):
+        np.concatenate(([self.phase.value], self.current_piece, self.board, self.pieces), out=self._obs_buffer)
+        return self._obs_buffer
+
+    def state_id(self) -> int:
+        return hash(self._obs_buffer.tobytes())
 
     def _check_win(self):
         for (i1, i2, i3, i4) in self._win_lines:
@@ -171,15 +177,12 @@ class QuartoEnv(gym.Env):
 
         return False
 
-
     def _asset(self, piece: np.ndarray):
         if piece[4] == 0:
             return None
         return self.pg_assets.get("".join(map(str, piece[:4].astype(int))))
 
-    def _init_pygame(self):
-        pygame.init()
-        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+    def _init_assets(self):
         self.pg_assets = {
             f"{i:04b}": pygame.transform.scale(
                 pygame.image.load(f"{settings.quarto_assets_path}/{i:04b}.png"),
@@ -189,19 +192,29 @@ class QuartoEnv(gym.Env):
         }
         self.pg_assets["-1-1-1-1"] = None
 
-        self.pg_board   = [[ImageButton(c * (self.PG_PIECE_W + self.PG_GAP),
-                                         (r + 1) * (self.PG_PIECE_H + self.PG_GAP),
-                                         self.PG_PIECE_W, self.PG_PIECE_H)
-                            for c in range(4)] for r in range(4)]
+        self.pg_board = [[ImageButton(c * (self.PG_PIECE_W + self.PG_GAP),
+                                       (r + 1) * (self.PG_PIECE_H + self.PG_GAP),
+                                       self.PG_PIECE_W, self.PG_PIECE_H)
+                          for c in range(4)] for r in range(4)]
 
-        self.pg_pieces  = [[ImageButton((c + 5) * (self.PG_PIECE_W + self.PG_GAP),
-                                         (r + 1) * (self.PG_PIECE_H + self.PG_GAP),
-                                         self.PG_PIECE_W, self.PG_PIECE_H)
-                            for c in range(4)] for r in range(4)]
+        self.pg_pieces = [[ImageButton((c + 5) * (self.PG_PIECE_W + self.PG_GAP),
+                                        (r + 1) * (self.PG_PIECE_H + self.PG_GAP),
+                                        self.PG_PIECE_W, self.PG_PIECE_H)
+                           for c in range(4)] for r in range(4)]
 
         self.pg_selected = ImageButton(self.PG_WINDOW_W - self.PG_PIECE_W, 0,
                                         self.PG_PIECE_W, self.PG_PIECE_H)
 
+    def _init_pygame(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        pygame.display.set_caption("Quarto")
+        self._init_assets()
+
+    def _init_offscreen(self):
+        pygame.init()
+        self._offscreen = pygame.Surface((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        self._init_assets()
 
     def _wait_for_human_click(self, mask: np.ndarray) -> int:
         while True:

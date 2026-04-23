@@ -8,11 +8,15 @@ from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
 from enum import IntEnum
 
+
 class Action(IntEnum):
     LEFT = 0
     RIGHT = 1
 
+
 class LineWorldEnv(gym.Env):
+
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
     BOARD_SIZE = 5
 
@@ -27,12 +31,16 @@ class LineWorldEnv(gym.Env):
         super().__init__()
         self.render_mode = render_mode
         self.screen = None
+        self._offscreen = None
+        self.last_action = 1
+
         if self.render_mode == "human":
             self._init_pygame()
+        elif self.render_mode == "rgb_array":
+            self._init_offscreen()
 
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(5,), dtype=np.float32)
         self.action_space = spaces.Discrete(2)
-
 
         self._action_mask_buffer = np.ones(self.action_space.n, dtype=np.float32)
 
@@ -70,45 +78,40 @@ class LineWorldEnv(gym.Env):
 
         return self._get_obs(), reward, terminated, False, {}
 
-    def render(self) -> None:
-        if self.render_mode != "human":
-            print("render_mode is not human")
+    def render(self):
+        if self.render_mode not in ("human", "rgb_array"):
             return
 
-        self.screen.fill((30, 30, 30))
+        surface = self.screen if self.render_mode == "human" else self._offscreen
+        surface.fill((30, 30, 30))
 
         for i in range(self.BOARD_SIZE):
             self.pg_board[i].image = None
             if i == self.agent_pos:
                 self.pg_board[i].image = self.pg_assets[self.last_action]
-            self.pg_board[i].draw(self.screen)
-        pygame.display.flip()
+            self.pg_board[i].draw(surface)
+
+        if self.render_mode == "human":
+            pygame.display.flip()
+        else:
+            return np.transpose(pygame.surfarray.array3d(surface), (1, 0, 2))
 
     def close(self):
-        if self.screen is not None:
+        if self.screen is not None or self._offscreen is not None:
             pygame.quit()
             self.screen = None
-
-    def _state_id(self):
-        return self.agent_pos
+            self._offscreen = None
 
     def get_action_mask(self):
         return self._action_mask_buffer
-        
+
     def _get_obs(self):
         return self.board
 
-    def _init_pygame(self):
-        if self.render_mode != "human":
-            print("render_mode is not human")
-            return
+    def state_id(self):
+        return self.agent_pos
 
-        pygame.init()
-        self.last_action = 1
-        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
-        print("init pygame")
-        pygame.display.set_caption("LineWorld")
-
+    def _init_assets(self):
         self.pg_assets = [
             pygame.transform.scale(
                 pygame.image.load(f"{settings.line_world_assets_path}/{i}.png"),
@@ -117,17 +120,33 @@ class LineWorldEnv(gym.Env):
             for i in range(0, 2)
         ]
 
-        self.pg_board   = [ImageButton(x = c * self.PG_PIECE_W + c * self.PG_GAP, y = 0,
-                                        width = self.PG_PIECE_W, height = self.PG_PIECE_H)
-                            for c in range(self.BOARD_SIZE)]
+        self.pg_board = [
+            ImageButton(
+                x=c * self.PG_PIECE_W + c * self.PG_GAP,
+                y=0,
+                width=self.PG_PIECE_W,
+                height=self.PG_PIECE_H
+            )
+            for c in range(self.BOARD_SIZE)
+        ]
         self.pg_board[0].score_text = str(-1)
         self.pg_board[0].score_color = (255, 0, 0)
         self.pg_board[4].score_text = str(1)
         self.pg_board[4].score_color = (0, 255, 0)
 
+    def _init_pygame(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        pygame.display.set_caption("LineWorld")
+        self._init_assets()
+
+    def _init_offscreen(self):
+        pygame.init()
+        self._offscreen = pygame.Surface((self.PG_WINDOW_W, self.PG_WINDOW_H))
+        self._init_assets()
+
     def _wait_for_human_click(self, mask=None):
         if self.render_mode != "human":
-            print("render_mode is not human")
             return
 
         while True:

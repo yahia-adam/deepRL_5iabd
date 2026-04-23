@@ -17,10 +17,11 @@ class Settings(BaseSettings):
 
     models_dir: str = "experimentation_logs/models"
     training_logs_dir: str = "experimentation_logs/train_logs"
+    videos_dir: str = "experimentation_logs/videos_logs"
 
-    line_world_assets_dir: str = "game_assets/line_world/v1"
-    grid_world_assets_dir: str = "game_assets/grid_world/v1"
-    tictactoe_assets_dir: str = "game_assets/tictactoe/v1"
+    line_world_assets_dir: str = "game_assets/line_world/v2"
+    grid_world_assets_dir: str = "game_assets/grid_world/v2"
+    tictactoe_assets_dir: str = "game_assets/tictactoe/v2"
     quarto_assets_dir: str = "game_assets/quarto/v1"
 
     @computed_field
