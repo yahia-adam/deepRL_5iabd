@@ -3,8 +3,7 @@ mes_notes.md
 __pycache__/
 *.py[codz]
 *$py.class
-experimentation_logs/models/
-experimentation_logs/train_logs/
+experimentation_logs/
 quarto_cpp.so
 
 # C extensions
@@ -211,3 +210,4 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+/experimentation_logs

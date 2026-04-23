@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.3.3",
+    "dagshub>=0.7.0",
+    "dvc==2.58.2",
+    "dvc-gdrive>=3.0.1",
     "gymnasium[other]>=1.2.3",
     "icecream>=2.1.10",
     "ipython>=9.10.0",

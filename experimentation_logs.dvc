@@ -1,0 +1,6 @@
+outs:
+- md5: a5f3dfe710c949893d4f236da0091750.dir
+  size: 8966815
+  nfiles: 63
+  hash: md5
+  path: experimentation_logs
