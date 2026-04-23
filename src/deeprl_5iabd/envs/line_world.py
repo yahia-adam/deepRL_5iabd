@@ -42,7 +42,7 @@ class LineWorldEnv(gym.Env):
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(5,), dtype=np.float32)
         self.action_space = spaces.Discrete(2)
 
-        self._action_mask_buffer = np.ones(self.action_space.n, dtype=np.float32)
+        self._action_mask_buffer = np.ones(self.action_space.n, dtype=np.int8)
 
         self.board = np.zeros(self.observation_space.shape[0], dtype=np.float32)
 
@@ -52,9 +52,10 @@ class LineWorldEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-
+    
         self.board[:] = 0
         self.agent_pos = 2
+        self.last_action = 1
         self.board[self.agent_pos] = 1
         return self._get_obs(), {}
 
@@ -63,8 +64,10 @@ class LineWorldEnv(gym.Env):
 
         if action == Action.LEFT.value:
             self.agent_pos = max(0, self.agent_pos - 1)
+            self.last_action = Action.LEFT.value
         elif action == Action.RIGHT.value:
             self.agent_pos = min(4, self.agent_pos + 1)
+            self.last_action = Action.RIGHT.value
         self.board[self.agent_pos] = 1
 
         terminated = (self.agent_pos == 0) or (self.agent_pos == 4)
@@ -155,10 +158,8 @@ class LineWorldEnv(gym.Env):
                     pygame.quit()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_LEFT:
-                        self.last_action = Action.LEFT
                         return Action.LEFT.value
                     elif event.key == pygame.K_RIGHT:
-                        self.last_action = Action.RIGHT
                         return Action.RIGHT.value
 
     def __str__(self):

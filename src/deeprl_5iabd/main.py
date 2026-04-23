@@ -30,12 +30,29 @@ def load_env(name: str, **kwargs):
     return cls(**kwargs)
 
 
-@click.group()
+MAIN_EXAMPLES = """
+\b
+Examples:
+  main.py bench quarto --episodes 5000
+  main.py train tictactoe q_learning --episodes 20000 --record
+  main.py train lineworld reinforce -n 50000 --record --record-every 1000
+  main.py play quarto
+"""
+
+@click.group(epilog=MAIN_EXAMPLES)
 def cli():
     """DeepRL CLI — entraînement et benchmark d'agents RL."""
 
 
-@cli.command()
+BENCH_EXAMPLES = """
+\b
+Examples:
+  main.py bench quarto
+  main.py bench tictactoe --episodes 5000
+  main.py bench lineworld -n 50000
+"""
+
+@cli.command(epilog=BENCH_EXAMPLES)
 @click.argument("env", type=ENV_CHOICES)
 @click.option("--episodes", "-n", default=10_000, show_default=True, help="Nombre de parties.")
 def bench(env: str, episodes: int):
@@ -61,7 +78,16 @@ def load_algo(name: str):
     return getattr(importlib.import_module(module_path), fn_name)
 
 
-@cli.command()
+TRAIN_EXAMPLES = """
+\b
+Examples:
+  main.py train tictactoe q_learning
+  main.py train quarto reinforce --episodes 50000
+  main.py train lineworld q_learning -n 20000 --record
+  main.py train gridworld reinforce -n 100000 --record --record-every 5000
+"""
+
+@cli.command(epilog=TRAIN_EXAMPLES)
 @click.argument("env",  type=ENV_CHOICES)
 @click.argument("algo", type=ALGO_CHOICES)
 @click.option("--episodes", "-n", default=10_000, show_default=True, help="Nombre d'épisodes.")
@@ -96,73 +122,43 @@ def train(env: str, algo: str, episodes: int, record: bool, record_every: int | 
     fn(environment, num_episodes=episodes)
     environment.close()
 
-@cli.command()
+
+PLAY_EXAMPLES = """
+\b
+Examples:
+  main.py play quarto
+  main.py play tictactoe
+  main.py play gridworld
+"""
+
+@cli.command(epilog=PLAY_EXAMPLES)
 @click.argument("env", type=ENV_CHOICES)
-@click.option("--mode", type=click.Choice(["hvr", "rvm", "mvm"]), default="hvr",
-              help="hvr=Human vs Random, rvm=Random vs Model, mvm=Model vs Model")
-@click.option("--model", "model_path", type=click.Path(exists=True), default=None,
-              help="Path to .pkl model (required for rvm/mvm)")
-@click.option("--model2", "model2_path", type=click.Path(exists=True), default=None,
-              help="Path to second .pkl model (optional for mvm, else same as --model)")
-@click.option("--delay", type=float, default=0.5,
-              help="Delay (s) between AI moves for visibility (default 0.5)")
-def play(env: str, mode: str, model_path: str | None, model2_path: str | None, delay: float):
-    """Parties en boucle avec rendu graphique. Ctrl+C pour quitter."""
-
-    def load_model(path):
-        with open(path, "rb") as f:
-            return pickle.load(f)
-
-    if mode in ("rvm", "mvm") and not model_path:
-        raise click.UsageError(f"--model is required for mode '{mode}'")
-    if mode == "mvm" and not model2_path:
-        model2_path = model_path
-
-    model = load_model(model_path) if model_path else None
-    model2 = load_model(model2_path) if model2_path else None
-
+def play(env: str):
+    """Human vs Random en mode graphique (parties en boucle, Ctrl+C pour quitter)."""
     environment = load_env(env, render_mode="human")
-
-    if not environment.is_multi_player:
-        solo_agent = "human" if mode == "hvr" else model
-    else:
-        agents = {
-            "hvr": ("human", "random"),
-            "rvm": ("random", model),
-            "mvm": (model, model2),
-        }
-        agent_p0, agent_p1 = agents[mode]
-
-    def pick_action(agent, mask):
-        if agent == "human":
-            return environment._wait_for_human_click(mask)
-        if agent == "random":
-            time.sleep(delay)
-            return environment.action_space.sample(mask=mask)
-        time.sleep(delay)
-        return agent.choose_action(environment, mask)
-
     while True:
-        environment.reset()
+
         done = False
+        environment.reset()
 
         while not done:
             environment.render()
             mask = environment.get_action_mask()
-
             if environment.is_multi_player:
-                agent = agent_p1 if environment.current_player == environment.agent_player else agent_p0
-            else:
-                agent = solo_agent
 
-            action = pick_action(agent, mask)
+                if (environment.current_player == environment.agent_player):
+                    action = environment.action_space.sample(mask=mask)
+                else:
+                    action = environment._wait_for_human_click(mask)
+
+            else:
+
+                action = environment._wait_for_human_click(mask)
+
             _, reward, terminated, truncated, _ = environment.step(action)
             done = terminated or truncated
-            print(f"reward: {reward}")
+            print(f"reward : {reward}")
 
-        # Pause entre les parties pour voir le résultat final
-        environment.render()
-        time.sleep(delay * 3)
-    
+
 if __name__ == "__main__":
     cli()

@@ -63,6 +63,9 @@ class QuartoEnv(gym.Env):
             (0,4,8,12), (1,5,9,13), (2,6,10,14), (3,7,11,15),
             (0,5,10,15), (3,6,9,12)
         ]
+
+        self.current_player = Player.PLAYER_1
+        self.agent_player = Player.PLAYER_1
         self.is_multi_player = True
 
     def reset(self, seed=None, options=None):
@@ -74,8 +77,6 @@ class QuartoEnv(gym.Env):
 
         self.phase = Phase.SELECT
         self.p_counter = 16
-        self.current_player = Player.PLAYER_1
-        self.agent_player = Player.PLAYER_1
         return self._get_obs(), {}
 
     def step(self, action):
