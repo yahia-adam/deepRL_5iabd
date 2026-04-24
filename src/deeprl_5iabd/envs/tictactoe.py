@@ -50,14 +50,27 @@ class TicTacToeEnv(gym.Env):
         self.current_player = Player.PLAYER_1
         self.agent_player = Player.PLAYER_1
         self.is_multi_player = True
+        self.count_step = 0
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
         self.board[:] = -1
         self.count_step = 0
+        self.current_player = self.agent_player
 
         return self._get_obs(), {}
+
+
+    def determinize(self):
+        env = TicTacToeEnv()
+        env.board[:] = self.board.copy()
+        env.count_step = 0
+
+        env.current_player = self.current_player
+        env.agent_player = self.agent_player
+
+        return env
 
     def step(self, action):
         self.board[action] = self.current_player.value

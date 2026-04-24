@@ -79,6 +79,21 @@ class QuartoEnv(gym.Env):
         self.p_counter = 16
         return self._get_obs(), {}
 
+
+    def determinize(self):
+        env = QuartoEnv()
+        env.board[:] = self.board.copy()
+        env.pieces[:] = self.pieces.copy()
+        env.current_piece[:] = self.current_piece.copy()
+        env.phase = self.phase
+        env.p_counter = self.p_counter
+
+        env.current_player = self.current_player
+        env.agent_player = self.agent_player
+
+        return env
+
+
     def step(self, action):
         reward = 0.0
         terminated = False

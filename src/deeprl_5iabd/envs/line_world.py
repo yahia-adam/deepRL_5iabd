@@ -52,12 +52,23 @@ class LineWorldEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-    
+
         self.board[:] = 0
         self.agent_pos = 2
         self.last_action = 1
         self.board[self.agent_pos] = 1
         return self._get_obs(), {}
+
+    def determinize(self):
+        env = LineWorldEnv()
+        env.board[:] = self.board.copy()
+        env.agent_pos = self.agent_pos
+        env.last_action = self.last_action
+        env.current_player = self.current_player
+        env.agent_player = self.agent_player
+        env.is_multi_player = self.is_multi_player
+
+        return env
 
     def step(self, action):
         self.board[self.agent_pos] = 0

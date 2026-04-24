@@ -34,7 +34,7 @@ class GridWorldEnv(gym.Env):
         self.render_mode = render_mode
         self.screen = None
         self._offscreen = None
-        self.last_action = Action.DOWN
+        self.last_action = Action.DOWN.value
 
         if self.render_mode == "human":
             self._init_pygame()
@@ -46,7 +46,7 @@ class GridWorldEnv(gym.Env):
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Box(low=0, high=1, shape=(25,), dtype=np.float32)
 
-        self._action_mask_buffer = np.ones(self.action_space.n, dtype=np.float32)
+        self._action_mask_buffer = np.ones(self.action_space.n, dtype=np.int8)
 
         self.board = np.zeros(self.observation_space.shape, dtype=np.float32)
         self.board[0] = 1
@@ -62,8 +62,20 @@ class GridWorldEnv(gym.Env):
         self.board[self.pos] = 1
         return self._get_obs(), {}
 
+    def determinize(self):
+        env = GridWorldEnv()
+        env.board[:] = self.board.copy()
+        env.pos = self.pos
+        env.last_action = self.last_action
+        env.current_player = self.current_player
+        env.agent_player = self.agent_player
+
+        return env
+
     def step(self, action):
         self.board[self.pos] = 0
+
+        self.last_action = action
 
         if action == Action.UP.value and self.pos not in [0, 1, 2, 3, 4]:
             self.pos -= 5
@@ -99,7 +111,7 @@ class GridWorldEnv(gym.Env):
         for r in range(self.BOARD_SIZE):
             for c in range(self.BOARD_SIZE):
                 if self.board[r * self.BOARD_SIZE + c] == 1:
-                    self.pg_board[r][c].image = self.pg_assets[self.last_action.value]
+                    self.pg_board[r][c].image = self.pg_assets[self.last_action]
                 else:
                     self.pg_board[r][c].image = None
                 self.pg_board[r][c].draw(surface)
@@ -170,16 +182,12 @@ class GridWorldEnv(gym.Env):
                     pygame.quit()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_LEFT:
-                        self.last_action = Action.LEFT
                         return Action.LEFT.value
                     elif event.key == pygame.K_RIGHT:
-                        self.last_action = Action.RIGHT
                         return Action.RIGHT.value
                     elif event.key == pygame.K_UP:
-                        self.last_action = Action.UP
                         return Action.UP.value
                     elif event.key == pygame.K_DOWN:
-                        self.last_action = Action.DOWN
                         return Action.DOWN.value
 
     def __str__(self):
