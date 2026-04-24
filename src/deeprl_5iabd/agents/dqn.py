@@ -48,7 +48,6 @@ def _choose_action_epsilon_greedy(
 
     # Exploitation : on convertit l'état en tenseur (avec dim batch)
     x = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
-    # Inférence sans calcul de gradient (plus rapide, moins de mémoire)
     with torch.no_grad():
         q_values = q_net(x)[0].numpy()
 
@@ -97,8 +96,9 @@ def _td_update(
                 # max_{a'} Q(s', a') restreint aux actions légales
                 max_q_next = torch.tensor(float(np.max(q_next[available_next])))
 
-        # Cible TD : r + γ · max Q(s', a')  (annulée si done)
-        td_target = reward + gamma * max_q_next * (0.0 if done else 1.0)
+        # Cible TD : r + γ · max Q(s', a')
+        # (max_q_next est déjà mis à 0 plus haut si done, donc pas de masque ici)
+        td_target = reward + gamma * max_q_next
 
     # Perte MSE entre Q(s,a) prédit et la cible TD
     loss = loss_fn(q_sa, td_target)
@@ -182,7 +182,6 @@ def dqn(
                     action = _choose_action_epsilon_greedy(state, mask, q_net, epsilon)
                     # Exécution (l'env passe au tour de l'adversaire)
                     new_state, reward, terminated, truncated, _ = env.step(action)
-                    ep_rewards.append(reward)
 
                     # Tour de l'adversaire aléatoire (PLACE puis SELECT)
                     if not (terminated or truncated):
@@ -210,6 +209,9 @@ def dqn(
                         terminated or truncated, gamma,
                     )
                     ep_losses.append(loss)
+                    # On enregistre le reward APRÈS patch par opp_reward
+                    # (sinon les défaites ne sont jamais comptées dans les stats)
+                    ep_rewards.append(reward)
                     state = new_state
 
             elif isinstance(env, TicTacToeEnv):
@@ -265,16 +267,19 @@ def dqn(
                 f"| ε={epsilon:.3f} | Loss={loss_per_episode[epoch]:.4f}"
             )
 
-    # Tracé des courbes de performance
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    # Tracé des courbes de performance (3 sous-graphiques)
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12))
 
-    # Taux de victoires et défaites sur fenêtre glissante de 100 épisodes
+    # --- Subplot 1 : taux de victoires et défaites sur fenêtre glissante de 100 épisodes
     wins_rate = np.zeros(num_episodes)
     losses_rate = np.zeros(num_episodes)
+    mean_reward = np.zeros(num_episodes)
     for t in range(num_episodes):
         recent = reward_per_episode[max(0, t - 100):t + 1]
         wins_rate[t] = np.sum(recent == 1) / len(recent) * 100
         losses_rate[t] = np.sum(recent == -1) / len(recent) * 100
+        # Reward moyen sur la fenêtre glissante (style "reinforce_mean_baseline")
+        mean_reward[t] = np.mean(recent)
 
     ax1.plot(wins_rate, label="Victoires %", color="green")
     ax1.plot(losses_rate, label="Défaites %", color="red")
@@ -283,11 +288,20 @@ def dqn(
     ax1.set_title(f"DQN (sans replay) - {env} | Win/Loss rate")
     ax1.legend()
 
-    ax2.plot(loss_per_episode, label="Loss")
+    # --- Subplot 2 : reward moyen (une seule courbe synthétique, style 2)
+    ax2.plot(mean_reward, color="blue")
+    ax2.axhline(0, color="gray", linestyle="--", linewidth=0.8)
     ax2.set_xlabel("Épisode")
-    ax2.set_ylabel("Loss")
-    ax2.set_title("Loss de l'algo")
-    ax2.legend()
+    ax2.set_ylabel("Reward moyen (100 épisodes)")
+    ax2.set_title(f"DQN (sans replay) - {env} | Mean reward")
+    ax2.set_ylim(-1.05, 1.05)
+
+    # --- Subplot 3 : loss
+    ax3.plot(loss_per_episode, label="Loss")
+    ax3.set_xlabel("Épisode")
+    ax3.set_ylabel("Loss")
+    ax3.set_title("Loss de l'algo")
+    ax3.legend()
 
     plt.tight_layout()
     # Sauvegarde du graphique
