@@ -1,7 +1,10 @@
 import torch
+import os
 import pygame
+import numpy as np
 from enum import IntEnum
 from torch.nn import functional as F
+import matplotlib.pyplot as plt
 
 class Player(IntEnum):
     PLAYER_1 = 0
@@ -38,3 +41,103 @@ def softmax_with_mask(S, M=None):
     exp_s = torch.exp(negative_or_null_s)
     masked_exp_s = exp_s * M
     return masked_exp_s / masked_exp_s.sum()
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def ema(values, alpha=0.1):
+    """Exponential moving average (lissage type TensorBoard)"""
+    smoothed = []
+    v = values[0]
+    for x in values:
+        v = alpha * x + (1 - alpha) * v
+        smoothed.append(v)
+    return np.array(smoothed)
+
+
+def plot_rl_dashboard(
+    reward_per_episode,
+    loss_per_episode,
+    algo_name="RL",
+    window=100,
+    reward_threshold=0,
+    ema_alpha=0.1,
+    save_path=None,
+):
+    n = len(reward_per_episode)
+
+    avg_reward, success, failure, avg_loss, variance = [], [], [], [], []
+
+    for i in range(0, n, window):
+        r = np.array(reward_per_episode[i:i+window])
+        l = np.array(loss_per_episode[i:i+window])
+
+        if len(r) == 0:
+            continue
+
+        avg_reward.append(np.mean(r))
+        success.append(np.sum(r > reward_threshold))
+        failure.append(np.sum(r < reward_threshold))
+        avg_loss.append(np.mean(l))
+        variance.append(np.var(r))
+
+    x = np.arange(len(avg_reward)) * window
+
+    # =========================
+    # Lissage EMA (style TensorBoard)
+    # =========================
+    avg_reward_s = ema(avg_reward, ema_alpha)
+    avg_loss_s = ema(avg_loss, ema_alpha)
+    success_s = ema(success, ema_alpha)
+    failure_s = ema(failure, ema_alpha)
+    variance_s = ema(variance, ema_alpha)
+
+    # =========================
+    # FIGURE DASHBOARD
+    # =========================
+    fig = plt.figure(figsize=(14, 10))
+
+    # ---- Reward ----
+    ax1 = plt.subplot(2, 2, 1)
+    ax1.plot(x, avg_reward_s, label="Reward moyen (EMA)")
+    ax1.set_title("Reward moyen")
+    ax1.set_xlabel("Episodes")
+    ax1.legend()
+
+    # ---- Success / Failure ----
+    ax2 = plt.subplot(2, 2, 2)
+    ax2.plot(x, success_s, label="Succès / 100 épisodes (EMA)")
+    ax2.plot(x, failure_s, label="Échecs / 100 épisodes (EMA)")
+    ax2.set_title("Performance (comptage)")
+    ax2.set_xlabel("Episodes")
+    ax2.legend()
+
+    # ---- Loss ----
+    ax3 = plt.subplot(2, 2, 3)
+    ax3.plot(x, avg_loss_s, label="Loss moyenne (EMA)")
+    ax3.set_title("Loss de la politique")
+    ax3.set_xlabel("Episodes")
+    ax3.legend()
+
+    # ---- Variance ----
+    ax4 = plt.subplot(2, 2, 4)
+    ax4.plot(x, variance_s, label="Variance des rewards (EMA)")
+    ax4.set_title("Stabilité de l’apprentissage")
+    ax4.set_xlabel("Episodes")
+    ax4.legend()
+
+    plt.suptitle(f"{algo_name} - RL Training Dashboard", fontsize=16)
+    plt.tight_layout()
+
+    # =========================
+    # SAVE IMAGE
+    # =========================
+    if save_path is not None:
+        os.makedirs(save_path, exist_ok=True)
+        file = os.path.join(save_path, f"{algo_name}_rl_dashboard.png")
+        plt.savefig(file, dpi=300)
+        print(f"Dashboard sauvegardé : {file}")
+
+    plt.show()
