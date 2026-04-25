@@ -5,6 +5,7 @@ import numpy as np
 from enum import IntEnum
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
+from deeprl_5iabd.config import settings
 
 class Player(IntEnum):
     PLAYER_1 = 0
@@ -42,11 +43,6 @@ def softmax_with_mask(S, M=None):
     masked_exp_s = exp_s * M
     return masked_exp_s / masked_exp_s.sum()
 
-import os
-import numpy as np
-import matplotlib.pyplot as plt
-
-
 def ema(values, alpha=0.1):
     """Exponential moving average (lissage type TensorBoard)"""
     smoothed = []
@@ -60,11 +56,12 @@ def ema(values, alpha=0.1):
 def plot_rl_dashboard(
     reward_per_episode,
     loss_per_episode,
-    algo_name="RL",
+    algo_name="algo",
+    env_name="env",
+    prams = None,
     window=100,
     reward_threshold=0,
     ema_alpha=0.1,
-    save_path=None,
 ):
     n = len(reward_per_episode)
 
@@ -128,16 +125,14 @@ def plot_rl_dashboard(
     ax4.set_xlabel("Episodes")
     ax4.legend()
 
-    plt.suptitle(f"{algo_name} - RL Training Dashboard", fontsize=16)
+    plt.suptitle(f"{algo_name} {env_name} {prams}", fontsize=16)
     plt.tight_layout()
 
     # =========================
     # SAVE IMAGE
     # =========================
-    if save_path is not None:
-        os.makedirs(save_path, exist_ok=True)
-        file = os.path.join(save_path, f"{algo_name}_rl_dashboard.png")
-        plt.savefig(file, dpi=300)
-        print(f"Dashboard sauvegardé : {file}")
-
-    plt.show()
+    save_path = f"{settings.training_logs_dir}/{algo_name}/{env_name}"
+    os.makedirs(save_path, exist_ok=True)
+    file = os.path.join(save_path, f"{algo_name} {env_name} {prams}.png")
+    plt.savefig(file, dpi=300)
+    print(f"Dashboard sauvegardé : {file}")

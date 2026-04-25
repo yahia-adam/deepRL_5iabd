@@ -31,13 +31,15 @@ class MCTSNode:
 
 
     def best_child(self, c_param=1.4):
+        is_agent_turn = (self.env.current_player == self.env.agent_player)
         choices = []
         for child in self.children:
             exploit = child.value / child.visits
+            if not is_agent_turn:
+                exploit = -exploit
             explore = c_param * math.sqrt(math.log(self.visits) / child.visits)
             choices.append(exploit + explore)
         return self.children[np.argmax(choices)]
-
 
     def expand(self):
         action = self.untried_actions[0]
@@ -169,13 +171,13 @@ def run_mcts(env: Env, num_episodes: int, num_simulations: int):
 
 if __name__ == "__main__":
     env = LineWorldEnv()
-    run_mcts(env, num_episodes=1_000, num_simulations=10)
+    run_mcts(env, num_episodes=1_000, num_simulations=100)
 
-    env = GridWorldEnv()  # ou QuartoEnv(), GridWorldEnv(), etc.
-    run_mcts(env, num_episodes=1_000, num_simulations=50)
+    env = GridWorldEnv()
+    run_mcts(env, num_episodes=1_000, num_simulations=100)
 
-    env = TicTacToeEnv()  # ou QuartoEnv(), GridWorldEnv(), etc.
-    run_mcts(env, num_episodes=1_000, num_simulations=50)
+    env = TicTacToeEnv()
+    run_mcts(env, num_episodes=1_000, num_simulations=100)
 
-    env = QuartoEnv()  # ou QuartoEnv(), GridWorldEnv(), etc.
-    run_mcts(env, num_episodes=1_000, num_simulations=50)
+    env = QuartoEnv()
+    run_mcts(env, num_episodes=1_000, num_simulations=100)

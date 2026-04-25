@@ -33,6 +33,7 @@ class LineWorldEnv(gym.Env):
         self.screen = None
         self._offscreen = None
         self.last_action = 1
+        self.agent_pos = 2
 
         if self.render_mode == "human":
             self._init_pygame()

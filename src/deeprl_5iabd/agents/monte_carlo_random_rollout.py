@@ -12,7 +12,7 @@ from deeprl_5iabd.envs.quarto import QuartoEnv
 from deeprl_5iabd.config import settings
 
 
-def monte_carlo_random_rollout(env: Env, num_rollouts: int):
+def monte_carlo_random_rollout(env: Env, num_simulations: int):
 
     mask = env.get_action_mask()
     action_mean_rewards = np.full(len(mask), -np.inf)
@@ -23,7 +23,7 @@ def monte_carlo_random_rollout(env: Env, num_rollouts: int):
     if len(valid_actions) == 0:
         return
     
-    a_resource = num_rollouts // len(valid_actions)
+    a_resource = num_simulations // len(valid_actions)
 
     for test_action in valid_actions:
         for _ in range(a_resource):
@@ -50,7 +50,7 @@ def monte_carlo_random_rollout(env: Env, num_rollouts: int):
 
 
 
-def run_monte_carlo(env: Env, num_episodes: int, num_rollouts: int):
+def run_monte_carlo(env: Env, num_episodes: int, num_simulations: int):
     rewards = []
     wins_rate, draws_rate, losses_rate = [], [], []
 
@@ -61,14 +61,14 @@ def run_monte_carlo(env: Env, num_episodes: int, num_rollouts: int):
 
         if not env.is_multi_player:
             while not done:
-                a = monte_carlo_random_rollout(env, num_rollouts)
+                a = monte_carlo_random_rollout(env, num_simulations)
                 _, reward, terminated, truncated, _ = env.step(a)
                 done = terminated or truncated
                 final_reward = reward
         else:
             while not done:
                 if env.current_player == env.agent_player:
-                    a = monte_carlo_random_rollout(env, num_rollouts)
+                    a = monte_carlo_random_rollout(env, num_simulations)
                 else:
                     mask = env.get_action_mask()
                     a = env.action_space.sample(mask=mask)
@@ -99,7 +99,7 @@ def run_monte_carlo(env: Env, num_episodes: int, num_rollouts: int):
     ax.plot(x, losses_rate, label="Défaites %",  color="red")
     ax.set_xlabel("Épisode")
     ax.set_ylabel("% sur 100 épisodes glissants")
-    ax.set_title(f"Monte Carlo Rollout — {env.unwrapped} | rollouts={num_rollouts}")
+    ax.set_title(f"Monte Carlo Rollout — {env.unwrapped} | rollouts={num_simulations}")
     ax.legend()
     plt.tight_layout()
 
@@ -110,16 +110,38 @@ def run_monte_carlo(env: Env, num_episodes: int, num_rollouts: int):
     plt.close()
     print(f"Plot saved → {path}")
 
+
+def hvr(env, num_episodes, num_simulations):
+
+
+    for e in num_episodes:
+        env.reset()
+        done = False
+        while not done:
+            env.render()
+            if env.current_player == env.agent_player:
+                a = monte_carlo_random_rollout(env, num_simulations)
+            else:
+                mask = env.get_action_mask()
+                a = env._wait_for_human_click(mask)
+
+            _, reward, terminated, truncated, _ = env.step(a)
+            done = terminated or truncated
+
+    print(reward)
+
 if __name__ == "__main__":
-    env = LineWorldEnv()  # ou TicTacToeEnv(), GridWorldEnv()...
-    run_monte_carlo(env, num_episodes=1_000, num_rollouts=50)
+    env = QuartoEnv(render_mode="human")
+    hvr(env, 2000)
+    # env = LineWorldEnv()
+    # run_monte_carlo(env, num_episodes=1_000, num_simulations=50)
 
-    env = GridWorldEnv()  # ou TicTacToeEnv(), GridWorldEnv()...
-    run_monte_carlo(env, num_episodes=1_000, num_rollouts=50)
+    # env = GridWorldEnv()
+    # run_monte_carlo(env, num_episodes=1_000, num_simulations=50)
 
 
-    env = TicTacToeEnv()  # ou TicTacToeEnv(), GridWorldEnv()...
-    run_monte_carlo(env, num_episodes=1_000, num_rollouts=50)
+    # env = TicTacToeEnv()
+    # run_monte_carlo(env, num_episodes=1_000, num_simulations=50)
 
-    env = QuartoEnv()  # ou TicTacToeEnv(), GridWorldEnv()...
-    run_monte_carlo(env, num_episodes=1_000, num_rollouts=50)
+    # env = QuartoEnv()
+    # run_monte_carlo(env, num_episodes=1_000, num_simulations=50)

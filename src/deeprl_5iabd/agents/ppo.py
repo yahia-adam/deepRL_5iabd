@@ -7,7 +7,6 @@ import torch.nn as nn
 import gymnasium as gym
 from torch import optim
 from torch.distributions import Categorical
-import matplotlib.pyplot as plt
 
 from deeprl_5iabd.helper import softmax_with_mask, plot_rl_dashboard
 from deeprl_5iabd.envs.line_world import LineWorldEnv
@@ -24,16 +23,15 @@ np.random.seed(seed)
 torch.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 
+
 # =========================================================
-# Policy Network
+# Policy / Value networks (identiques à REINFORCE)
 # =========================================================
 class ActorAgent(nn.Module):
     def __init__(self, env):
         super().__init__()
-
         obs_size = np.array(env.observation_space.shape).prod()
         action_size = env.action_space.n
-
         self.network = nn.Sequential(
             nn.Linear(obs_size, 120),
             nn.ReLU(),
@@ -47,14 +45,13 @@ class ActorAgent(nn.Module):
         probs = softmax_with_mask(logits, action_mask)
         return probs
 
+
 class CriticAgent(nn.Module):
     def __init__(self, env):
         super().__init__()
-
-        observation_size = np.array(env.observation_space.shape).prod()
-
+        obs_size = np.array(env.observation_space.shape).prod()
         self.network = nn.Sequential(
-            nn.Linear(observation_size, 120),
+            nn.Linear(obs_size, 120),
             nn.ReLU(),
             nn.Linear(120, 84),
             nn.ReLU(),
@@ -66,71 +63,51 @@ class CriticAgent(nn.Module):
 
 
 # =========================================================
-# Compute discounted returns (Monte Carlo)
+# Monte Carlo returns (identique à REINFORCE)
 # =========================================================
-def compute_returns(rewards, gamma, ):
+def compute_returns(rewards, gamma):
     returns = []
-
     for t in range(len(rewards)):
         G_t = 0
         power = 0
-
         for r in rewards[t:]:
             G_t += (gamma ** power) * r
             power += 1
-
         returns.append(G_t)
-
     return returns
 
+
 # =========================================================
-# gradient loss (REINFORCE)
+# Losses PPO
 # =========================================================
-def compute_policy_loss(log_probs, returns, baseline = 0, critic_values=None):
-    loss = 0
+def compute_ppo_loss(new_log_probs, old_log_probs, advantages, clip_eps):
+    ratio = torch.exp(new_log_probs - old_log_probs)
+    surr1 = ratio * advantages
+    surr2 = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * advantages
+    return -torch.min(surr1, surr2).mean()
 
-    if (critic_values != None):
-        for log_prob_t, return_t, critic_value in zip(log_probs, returns, critic_values):
-            advantage = return_t - critic_value.detach()
-            loss += -log_prob_t * advantage
-    else :
-        for log_prob_t, return_t in zip(log_probs, returns):
-            advantage = return_t - baseline
-            loss += -log_prob_t * advantage
-    return loss
 
-def compute_critic_loss(critic_values, returns):
-    total_loss = 0
-
-    for c_value, re in zip(critic_values, returns):
-        total_loss += (c_value - re) ** 2
-
-    total_loss = total_loss / len(returns)
-    return total_loss
+def compute_critic_loss(values, returns):
+    return ((values - returns) ** 2).mean()
 
 
 # =========================================================
 # Training loop
 # =========================================================
-def reinforce(
+def ppo(
     env: gym.Env,
     num_episodes: int = 10_000,
     lr: float = 0.001,
     gamma: float = 0.99,
-    use_mean_baseline: bool = True,
-    use_critic_baseline = True
+    clip_eps: float = 0.2,
+    update_epochs: int = 4,
 ):
 
-    # -----------------------------------------
-    # Init agent
-    # -----------------------------------------
-    reinforce_agent = ActorAgent(env)
+    actor_agent = ActorAgent(env)
+    critic_agent = CriticAgent(env)
 
-    if use_critic_baseline:
-        critic_agent = CriticAgent(env)
-        critic_optimizer = optim.Adam(critic_agent.parameters(), lr=lr)
-
-    optimizer = optim.Adam(reinforce_agent.parameters(), lr=lr)
+    actor_optimizer = optim.Adam(actor_agent.parameters(), lr=lr)
+    critic_optimizer = optim.Adam(critic_agent.parameters(), lr=lr)
 
     rewards_history = np.zeros(num_episodes)
     loss_history = np.zeros(num_episodes)
@@ -140,20 +117,20 @@ def reinforce(
     # =========================================================
     for episode in range(num_episodes):
 
-        log_probs_episode = []
+        # Rollout buffers
+        states_episode = []
+        actions_episode = []
+        masks_episode = []
+        old_log_probs_episode = []
         rewards_episode = []
-
-        if use_critic_baseline:
-            episode_critic_values = []
 
         state, _ = env.reset(seed)
         done = False
 
         # =====================================================
-        # Interaction loop
+        # Interaction loop (identique à REINFORCE)
         # =====================================================
         while not done:
-
             action_mask = env.get_action_mask()
 
             # =================================================
@@ -161,21 +138,20 @@ def reinforce(
             # =================================================
             if isinstance(env, QuartoEnv):
 
-                # -------- PLACE --------
                 if env.current_player == env.agent_player:
+                    # -------- PLACE --------
                     if env.phase == Phase.PLACE:
-
                         state_tensor = torch.tensor(state).float()
 
-                        action_probs = reinforce_agent(state_tensor, action_mask)
+                        with torch.no_grad():
+                            action_probs = actor_agent(state_tensor, action_mask)
                         dist = Categorical(action_probs)
-
                         action = dist.sample()
-                        log_probs_episode.append(dist.log_prob(action))
 
-                        if use_critic_baseline:
-                            value = critic_agent(state_tensor)
-                            episode_critic_values.append(value)
+                        states_episode.append(state_tensor)
+                        actions_episode.append(action)
+                        masks_episode.append(action_mask)
+                        old_log_probs_episode.append(dist.log_prob(action).detach())
 
                         state, reward, done, truncated, _ = env.step(action.item())
                         rewards_episode.append(reward)
@@ -183,22 +159,19 @@ def reinforce(
                         if done or truncated:
                             break
 
-                    # -------------------------
-                    # PHASE: SELECT
-                    # -------------------------
+                    # -------- SELECT --------
                     if env.phase == Phase.SELECT:
-
                         state_tensor = torch.tensor(state).float()
 
-                        action_probs = reinforce_agent(state_tensor, action_mask)
+                        with torch.no_grad():
+                            action_probs = actor_agent(state_tensor, action_mask)
                         dist = Categorical(action_probs)
-
                         action = dist.sample()
-                        log_probs_episode.append(dist.log_prob(action))
 
-                        if use_critic_baseline:
-                            value = critic_agent(state_tensor)
-                            episode_critic_values.append(value)
+                        states_episode.append(state_tensor)
+                        actions_episode.append(action)
+                        masks_episode.append(action_mask)
+                        old_log_probs_episode.append(dist.log_prob(action).detach())
 
                         state, reward, done, truncated, _ = env.step(action.item())
                         rewards_episode.append(reward)
@@ -207,76 +180,86 @@ def reinforce(
                             break
                 else:
                     # -------------------------------------
-                    # Opponent plays (random agent)
+                    # Opponent plays (random)
                     # -------------------------------------
                     action_mask = env.get_action_mask()
                     opponent_action = env.action_space.sample(mask=action_mask)
-
                     state, reward, done, truncated, _ = env.step(opponent_action)
 
                     if done or truncated:
                         rewards_episode[-1] = reward
                         break
 
-                    # second opponent move
                     action_mask = env.get_action_mask()
                     opponent_action = env.action_space.sample(mask=action_mask)
-
                     state, reward, done, truncated, _ = env.step(opponent_action)
 
             # =================================================
-            # OTHER ENVIRONMENTS (TicTacToe, GridWorld, etc.)
+            # OTHER ENVIRONMENTS
             # =================================================
             else:
                 state_tensor = torch.tensor(state).float()
 
-                action_probs = reinforce_agent(state_tensor, action_mask)
+                with torch.no_grad():
+                    action_probs = actor_agent(state_tensor, action_mask)
                 dist = Categorical(action_probs)
-
                 action = dist.sample()
-                log_probs_episode.append(dist.log_prob(action))
 
-                if use_critic_baseline:
-                    value = critic_agent(state_tensor)
-                    episode_critic_values.append(value)
+                states_episode.append(state_tensor)
+                actions_episode.append(action)
+                masks_episode.append(action_mask)
+                old_log_probs_episode.append(dist.log_prob(action).detach())
 
                 state, reward, done, truncated, _ = env.step(action.item())
                 rewards_episode.append(reward)
 
         # =========================================================
-        # Episode finished → compute learning signal
+        # Episode fini → PPO update
         # =========================================================
         rewards_history[episode] = np.sum(rewards_episode)
 
         returns = compute_returns(rewards_episode, gamma)
+        returns_tensor = torch.tensor(returns, dtype=torch.float32)
+        old_log_probs_tensor = torch.stack(old_log_probs_episode)
+        actions_tensor = torch.stack(actions_episode)
 
-        if (use_critic_baseline):
-            loss = compute_policy_loss(log_probs_episode, returns, critic_values=episode_critic_values)
-        else:
-            baseline = np.mean(returns) if use_mean_baseline else 0
-            loss = compute_policy_loss(log_probs_episode, returns, baseline=baseline)
+        # K passes d'update sur le rollout collecté
+        for _ in range(update_epochs):
+            new_log_probs = []
+            values = []
+            for s, a, m in zip(states_episode, actions_tensor, masks_episode):
+                probs = actor_agent(s, m)
+                dist = Categorical(probs)
+                new_log_probs.append(dist.log_prob(a))
+                values.append(critic_agent(s))
 
-        if (use_critic_baseline):
-            critic_loss = compute_critic_loss(episode_critic_values, returns)
+            new_log_probs = torch.stack(new_log_probs)
+            values = torch.stack(values)
+
+            advantages = returns_tensor - values.detach()
+            if len(advantages) > 1:
+                advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+            actor_loss = compute_ppo_loss(new_log_probs, old_log_probs_tensor, advantages, clip_eps)
+            critic_loss = compute_critic_loss(values, returns_tensor)
+
+            actor_optimizer.zero_grad()
+            actor_loss.backward()
+            actor_optimizer.step()
+
             critic_optimizer.zero_grad()
             critic_loss.backward()
-            critic_optimizer.step()            
+            critic_optimizer.step()
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        loss_history[episode] = loss.item()
+        loss_history[episode] = actor_loss.item()
 
         # =========================================================
         # Logging
         # =========================================================
         if episode % 100 == 0:
             recent_rewards = rewards_history[max(0, episode - 100):episode + 1]
-
             win_rate = np.mean(recent_rewards == 1) * 100
             loss_rate = np.mean(recent_rewards == -1) * 100
-
             print(
                 f"Episode {episode} | "
                 f"Win={win_rate:.0f}% Lose={loss_rate:.0f}% | "
@@ -284,64 +267,38 @@ def reinforce(
             )
 
     # =========================================================
-    # Plot training dashboard
+    # Plot + save
     # =========================================================
-    exp_name = "mean_baseline" if use_mean_baseline else "critic_baseline" if use_critic_baseline else "no_baseline"
-    exp_name = f"{exp_name} seed={seed}"
+    exp_name = f"clip={clip_eps} epochs={update_epochs} seed={seed}"
     plot_rl_dashboard(
         rewards_history,
         loss_history,
-        algo_name=f"reinforce",
+        algo_name="ppo",
         env_name=env.unwrapped,
-        prams=exp_name
+        prams=exp_name,
     )
 
-    # =========================================================
-    # Save model
-    # =========================================================
-    model_dir = f"{settings.models_path}/reinforce_{use_mean_baseline}_baseline/{env.unwrapped}"
+    model_dir = f"{settings.models_path}/ppo/{env.unwrapped}"
     os.makedirs(model_dir, exist_ok=True)
-
     with open(f"{model_dir}/model.pkl", "wb") as f:
-        pickle.dump(reinforce_agent, f)
+        pickle.dump(actor_agent, f)
 
     env.close()
+    return actor_agent
 
-    return reinforce_agent
-
-
-# =========================================================
-# Entry point
-# =========================================================
 
 # =========================================================
 # Entry point
 # =========================================================
 if __name__ == "__main__":
     env = LineWorldEnv()
-    reinforce(env, num_episodes=10_000, use_mean_baseline=False, use_critic_baseline=False)
-    env = LineWorldEnv()
-    reinforce(env, num_episodes=10_000, use_mean_baseline=True,  use_critic_baseline=False)
-    env = LineWorldEnv()
-    reinforce(env, num_episodes=10_000, use_mean_baseline=False, use_critic_baseline=True)
+    ppo(env, num_episodes=10_000)
 
     env = GridWorldEnv()
-    reinforce(env, num_episodes=50_000, use_mean_baseline=False, use_critic_baseline=False)
-    env = GridWorldEnv()
-    reinforce(env, num_episodes=50_000, use_mean_baseline=True,  use_critic_baseline=False)
-    env = GridWorldEnv()
-    reinforce(env, num_episodes=50_000, use_mean_baseline=False, use_critic_baseline=True)
+    ppo(env, num_episodes=50_000)
 
     env = TicTacToeEnv()
-    reinforce(env, num_episodes=100_000, use_mean_baseline=False, use_critic_baseline=False)
-    env = TicTacToeEnv()
-    reinforce(env, num_episodes=100_000, use_mean_baseline=True,  use_critic_baseline=False)
-    env = TicTacToeEnv()
-    reinforce(env, num_episodes=100_000, use_mean_baseline=False, use_critic_baseline=True)
+    ppo(env, num_episodes=100_000)
 
     env = QuartoEnv()
-    reinforce(env, num_episodes=100_000, use_mean_baseline=False, use_critic_baseline=False)
-    env = QuartoEnv()
-    reinforce(env, num_episodes=100_000, use_mean_baseline=True,  use_critic_baseline=False)
-    env = QuartoEnv()
-    reinforce(env, num_episodes=100_000, use_mean_baseline=False, use_critic_baseline=True)
+    ppo(env, num_episodes=100_000)
