@@ -211,3 +211,31 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 /experimentation_logs
+
+# Project-specific artefacts
+# ---------------------------
+# Modèles sérialisés (sauvegardes Q-Network, REINFORCE, etc.)
+*.pkl
+*.pickle
+
+# Les figures d'entraînement (PNG/PDF/SVG) sont rangées sous doc/ qui est
+# ignoré globalement plus bas, donc pas besoin de pattern *.png global qui
+# entrerait en conflit avec game_assets/.
+
+# Dossiers de résultats / sorties d'entraînement
+results/
+src/results/
+runs/
+outputs/
+
+# Documentation / papiers de référence (non versionnés)
+doc/
+
+# Fichiers de sauvegarde nano / éditeurs
+*.save
+*~
+*.bak
+*.swp
+
+# Notes locales utilisateur
+commandes_utiles.txt
