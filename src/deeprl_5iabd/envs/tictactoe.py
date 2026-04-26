@@ -6,6 +6,7 @@ from gymnasium import spaces
 from deeprl_5iabd.helper import Player
 from deeprl_5iabd.config import settings
 from deeprl_5iabd.helper import ImageButton
+import time
 
 
 class TicTacToeEnv(gym.Env):
@@ -39,6 +40,8 @@ class TicTacToeEnv(gym.Env):
         elif self.render_mode == "rgb_array":
             self._init_offscreen()
 
+        self.info_message = ""
+
         self.board = np.full(9, -1, dtype=np.float32)
 
         self.action_space = spaces.Discrete(len(self.board), dtype=np.int8)
@@ -47,7 +50,7 @@ class TicTacToeEnv(gym.Env):
         self._obs_buffer = np.zeros(self.observation_space.shape[0], dtype=np.float32)
         self._action_mask_buffer = np.zeros(self.action_space.n, dtype=np.int8)
 
-        self.current_player = Player.PLAYER_1
+        self.current_player = Player(np.random.choice(list(Player)))
         self.agent_player = Player.PLAYER_1
         self.is_multi_player = True
         self.count_step = 0
@@ -55,9 +58,11 @@ class TicTacToeEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
+        self.info_message = ""
+
         self.board[:] = -1
         self.count_step = 0
-        self.current_player = self.agent_player
+        self.current_player = Player(np.random.choice(list(Player)))
 
         return self._get_obs(), {}
 
@@ -82,10 +87,16 @@ class TicTacToeEnv(gym.Env):
 
         if self._check_win():
             terminated = True
-            reward = 1.0 if self.current_player == self.agent_player else -1.0
+            if (self.current_player) == self.agent_player:
+                self.info_message = "Agent a gagné !"
+                reward = 1.0
+            else:
+                self.info_message = "Agent a perdu !"
+                reward = -1.0
         elif self.count_step == 9:
             terminated = True
             reward = 0.0
+            self.info_message = "Match nul !"
 
         self.current_player = Player.PLAYER_2 if self.current_player == Player.PLAYER_1 else Player.PLAYER_1
         return self._get_obs(), reward, terminated, False, {}
@@ -98,8 +109,11 @@ class TicTacToeEnv(gym.Env):
         surface.fill((0, 0, 0))
 
         font = pygame.font.SysFont(None, 36)
-        surface.blit(font.render(f"Joueur {self.current_player} jouer", True, (255, 255, 255)), (10, 10))
-
+        if self.info_message:
+            surface.blit(font.render(self.info_message, True, (255, 0, 0)), (10, 10))
+        else:
+            surface.blit(font.render(f"Joueur {self.current_player} jouer", True, (255, 255, 255)), (10, 10))
+    
         for r in range(3):
             for c in range(3):
                 if self.board[r * 3 + c] == Player.PLAYER_1.value:
@@ -194,3 +208,66 @@ class TicTacToeEnv(gym.Env):
 
     def __str__(self):
         return "TicTacToeEnv"
+
+
+
+def human_vs_random(env: TicTacToeEnv):
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        mask = env.get_action_mask()        
+        if env.current_player == env.agent_player:
+            _, reward, done, truncated, _ = env.step(env.action_space.sample(mask=mask))
+        else :
+            _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
+        env.render()
+
+        done = done or truncated
+
+    if reward == 1.0:
+        print(f"{'Croix' if env.agent_player.value == 1 else 'Ronds'} a gagné")
+    elif reward == -1.0:
+        print(f"{'Croix' if env.agent_player.value == 1 else 'Ronds'} a perdu")
+    else:
+        print("Match nul")
+    print("\n")
+    print(reward)
+    env.render()
+    time.sleep(2)
+
+
+def human_vs_human(env: TicTacToeEnv):
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        mask = env.get_action_mask()        
+        if env.current_player == env.agent_player:
+            _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
+        else :
+            _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
+        env.render()
+
+        done = done or truncated
+
+    if reward == 1.0:
+        print(f"{'Croix' if env.agent_player.value == 1 else 'Ronds'} a gagné")
+    elif reward == -1.0:
+        print(f"{'Croix' if env.agent_player.value == 1 else 'Ronds'} a perdu")
+    else:
+        print("Match nul")
+    print("\n")
+
+    print(reward)
+    env.render()
+    time.sleep(10)
+
+if __name__ == "__main__":
+    env = TicTacToeEnv(render_mode="human")
+    
+    while True:
+        human_vs_random(env)
+        # human_vs_human(env)
+
+    env.close()

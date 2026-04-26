@@ -112,6 +112,7 @@ class LineWorldEnv(gym.Env):
             return np.transpose(pygame.surfarray.array3d(surface), (1, 0, 2))
 
     def close(self):
+
         if self.screen is not None or self._offscreen is not None:
             pygame.quit()
             self.screen = None
@@ -176,3 +177,39 @@ class LineWorldEnv(gym.Env):
 
     def __str__(self):
         return "LineWorldEnv"
+
+
+def random_player(env: LineWorldEnv):
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        time.sleep(0.1)
+
+        _, reward, done, truncated, _ = env.step(env.action_space.sample())
+        done = done or truncated
+        env.render()
+
+    print(reward)
+    time.sleep(1)
+
+
+def human_player(env: LineWorldEnv):
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        _, reward, done, truncated, _ = env.step(env._wait_for_human_click())
+        done = done or truncated
+        env.render()
+
+    print(reward)
+    time.sleep(1)
+
+if __name__ == "__main__":
+    env = LineWorldEnv(render_mode="human")
+    
+    while True:
+        # human_player(env)
+        random_player(env)
+    env.close()

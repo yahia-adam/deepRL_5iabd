@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     device: str = Field(default_factory=get_default_device)
 
     training_logs_dir: str = "experimentation_logs/train_logs"
+    evaluation_logs_dir: str = "experimentation_logs/eval_logs"
     models_dir: str = "experimentation_logs/models_logs"
     videos_dir: str = "experimentation_logs/videos_logs"
 
@@ -38,6 +39,11 @@ class Settings(BaseSettings):
     @property
     def training_logs_path(self) -> Path:
         return self.project_path / self.training_logs_dir
+
+    @computed_field
+    @property
+    def evaluation_logs_path(self) -> Path:
+        return self.project_path / self.evaluation_logs_dir
 
     @computed_field
     @property

@@ -7,6 +7,7 @@ from torch.nn import functional as F
 import matplotlib.pyplot as plt
 from deeprl_5iabd.config import settings
 
+
 class Player(IntEnum):
     PLAYER_1 = 0
     PLAYER_2 = 1
@@ -43,96 +44,43 @@ def softmax_with_mask(S, M=None):
     masked_exp_s = exp_s * M
     return masked_exp_s / masked_exp_s.sum()
 
-def ema(values, alpha=0.1):
-    """Exponential moving average (lissage type TensorBoard)"""
-    smoothed = []
-    v = values[0]
-    for x in values:
-        v = alpha * x + (1 - alpha) * v
-        smoothed.append(v)
-    return np.array(smoothed)
-
-
-def plot_rl_dashboard(
-    reward_per_episode,
-    loss_per_episode,
-    algo_name="algo",
-    env_name="env",
-    prams = None,
-    window=100,
-    reward_threshold=0,
-    ema_alpha=0.1,
+def plot_metric(
+    values,
+    save_dir="results/plots",
+    window_size=100,
+    metric_name="metric",
+    exp_name="exp",
+    ylim=None,
+    mask=None,
 ):
-    n = len(reward_per_episode)
+    os.makedirs(save_dir, exist_ok=True)
 
-    avg_reward, success, failure, avg_loss, variance = [], [], [], [], []
+    values = np.asarray(values, dtype=float)
+    n = len(values)
+    w = max(1, min(window_size, n))
+    valid = np.ones(n) if mask is None else np.asarray(mask, dtype=float)
 
-    for i in range(0, n, window):
-        r = np.array(reward_per_episode[i:i+window])
-        l = np.array(loss_per_episode[i:i+window])
+    def rolling_sum(a):
+        c = np.cumsum(a).astype(float)
+        out = c.copy()
+        out[w:] -= c[:-w]
+        return out
 
-        if len(r) == 0:
-            continue
+    num = rolling_sum(values * valid)
+    den = rolling_sum(valid)
+    rolling = np.where(den > 0, num / np.maximum(den, 1), np.nan)
 
-        avg_reward.append(np.mean(r))
-        success.append(np.sum(r > reward_threshold))
-        failure.append(np.sum(r < reward_threshold))
-        avg_loss.append(np.mean(l))
-        variance.append(np.var(r))
+    plt.figure(figsize=(10, 5))
+    plt.plot(rolling, label=f"{metric_name} (window={w})")
+    plt.title(f"{exp_name} - {metric_name}")
+    plt.xlabel("Episodes")
+    plt.ylabel(metric_name)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
 
-    x = np.arange(len(avg_reward)) * window
-
-    # =========================
-    # Lissage EMA (style TensorBoard)
-    # =========================
-    avg_reward_s = ema(avg_reward, ema_alpha)
-    avg_loss_s = ema(avg_loss, ema_alpha)
-    success_s = ema(success, ema_alpha)
-    failure_s = ema(failure, ema_alpha)
-    variance_s = ema(variance, ema_alpha)
-
-    # =========================
-    # FIGURE DASHBOARD
-    # =========================
-    fig = plt.figure(figsize=(14, 10))
-
-    # ---- Reward ----
-    ax1 = plt.subplot(2, 2, 1)
-    ax1.plot(x, avg_reward_s, label="Reward moyen (EMA)")
-    ax1.set_title("Reward moyen")
-    ax1.set_xlabel("Episodes")
-    ax1.legend()
-
-    # ---- Success / Failure ----
-    ax2 = plt.subplot(2, 2, 2)
-    ax2.plot(x, success_s, label="Succès / 100 épisodes (EMA)")
-    ax2.plot(x, failure_s, label="Échecs / 100 épisodes (EMA)")
-    ax2.set_title("Performance (comptage)")
-    ax2.set_xlabel("Episodes")
-    ax2.legend()
-
-    # ---- Loss ----
-    ax3 = plt.subplot(2, 2, 3)
-    ax3.plot(x, avg_loss_s, label="Loss moyenne (EMA)")
-    ax3.set_title("Loss de la politique")
-    ax3.set_xlabel("Episodes")
-    ax3.legend()
-
-    # ---- Variance ----
-    ax4 = plt.subplot(2, 2, 4)
-    ax4.plot(x, variance_s, label="Variance des rewards (EMA)")
-    ax4.set_title("Stabilité de l’apprentissage")
-    ax4.set_xlabel("Episodes")
-    ax4.legend()
-
-    plt.suptitle(f"{algo_name} {env_name} {prams}", fontsize=16)
-    plt.tight_layout()
-
-    # =========================
-    # SAVE IMAGE
-    # =========================
-    save_path = f"{settings.training_logs_dir}/{algo_name}/{env_name}"
-    os.makedirs(save_path, exist_ok=True)
-    file = os.path.join(save_path, f"{algo_name} {env_name} {prams}.png")
-    plt.savefig(file, dpi=300)
-    print(f"Dashboard sauvegardé : {file}")
+    path = os.path.join(save_dir, f"{exp_name}_{metric_name}.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
+    plt.close()
+    return path

@@ -8,7 +8,7 @@ from deeprl_5iabd.helper import ImageButton
 from deeprl_5iabd.config import settings
 from enum import IntEnum
 from deeprl_5iabd.helper import Player
-
+import time
 
 class Phase(IntEnum):
     SELECT = 0
@@ -39,6 +39,7 @@ class QuartoEnv(gym.Env):
         elif self.render_mode == "rgb_array":
             self._init_offscreen()
 
+        self.info_message = ""
         self.phase = Phase.SELECT
         self.current_piece = np.zeros(5, dtype=np.float32)
         self.board = np.zeros(16*5, dtype=np.float32)
@@ -64,8 +65,9 @@ class QuartoEnv(gym.Env):
             (0,5,10,15), (3,6,9,12)
         ]
 
-        self.current_player = Player.PLAYER_1
+        self.current_player = Player(np.random.choice(list(Player)))
         self.agent_player = Player.PLAYER_1
+
         self.is_multi_player = True
 
     def reset(self, seed=None, options=None):
@@ -74,6 +76,9 @@ class QuartoEnv(gym.Env):
         self.pieces[4::5] = 1
         self.board[:] = 0
         self.current_piece[:] = 0
+        self.info_message = ""
+
+        self.current_player = Player(np.random.choice(list(Player)))
 
         self.phase = Phase.SELECT
         self.p_counter = 16
@@ -108,11 +113,11 @@ class QuartoEnv(gym.Env):
             if is_win and self.current_player == self.agent_player:
                 reward = 1.0
                 terminated = True
-                info["msg"] = f"Agent a gagné !"
+                self.info_message = f"Agent a gagné !"
             elif is_win and self.current_player != self.agent_player:
                 reward = -1.0
                 terminated = True
-                info["msg"] = f"Agent a perdu !"
+                self.info_message = f"Agent a perdu !"
             elif self.p_counter == 0:
                 terminated = True
                 info["msg"] = "Match Nul !"
@@ -142,7 +147,10 @@ class QuartoEnv(gym.Env):
             Phase.PLACE:  "placez la pièce",
         }.get(self.phase, "Fin de partie")
 
-        surface.blit(font.render(f"Joueur {self.current_player.value} — {phase_label}", True, (255, 255, 255)), (10, 10))
+        if self.info_message:
+            surface.blit(font.render(f"Info: {self.info_message}", True, (255, 0, 0)), (10, 10))
+        else:
+            surface.blit(font.render(f"Joueur {self.current_player.value} — {phase_label}", True, (255, 255, 255)), (10, 10))
 
         for r in range(4):
             for c in range(4):
@@ -251,3 +259,50 @@ class QuartoEnv(gym.Env):
 
     def __str__(self):
         return "QuartoEnv"
+
+
+def human_vs_random(env: QuartoEnv):
+    
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        mask = env.get_action_mask()        
+        if env.current_player == env.agent_player:
+            _, reward, done, truncated, _ = env.step(env.action_space.sample(mask=mask))
+        else:
+            _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
+        env.render()
+
+        done = done or truncated
+
+    print(reward)
+    env.render()
+    time.sleep(10)
+
+def human_vs_human(env: QuartoEnv):
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        mask = env.get_action_mask()        
+        if env.current_player == Player.agent_player:
+            _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
+        else:
+            _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
+        env.render()
+
+        done = done or truncated
+
+    print(reward)
+    env.render()
+    time.sleep(10)
+
+if __name__ == "__main__":
+    env = QuartoEnv(render_mode="human")
+    
+    while True:
+        human_vs_random(env)
+        # human_vs_human(env)
+    
+    env.close()
