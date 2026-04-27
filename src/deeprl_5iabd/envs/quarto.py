@@ -286,7 +286,7 @@ def human_vs_human(env: QuartoEnv):
     done = False
     while not done:
         mask = env.get_action_mask()        
-        if env.current_player == Player.agent_player:
+        if env.current_player == env.agent_player:
             _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
         else:
             _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
@@ -302,7 +302,7 @@ if __name__ == "__main__":
     env = QuartoEnv(render_mode="human")
     
     while True:
-        human_vs_random(env)
-        # human_vs_human(env)
-    
+        # human_vs_random(env)
+        human_vs_human(env)
+
     env.close()

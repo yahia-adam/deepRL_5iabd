@@ -84,3 +84,20 @@ def plot_metric(
     plt.savefig(path, dpi=300, bbox_inches="tight")
     plt.close()
     return path
+
+
+
+def plot_trace(trace, name="plot"):
+    plt.figure()
+
+    plt.plot(trace, marker='o')
+
+    plt.title("Evolution du score")
+    plt.xlabel("Step / Episode")
+    plt.ylabel("Score")
+    plt.yticks([-1, 0, 1])
+    plt.grid()
+
+    plt.savefig(f"{name}.png", bbox_inches='tight')
+
+    plt.close()

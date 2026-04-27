@@ -125,6 +125,7 @@ def hvr(env, num_episodes, num_simulations):
             env.render()
             if env.current_player == env.agent_player:
                 a = monte_carlo_random_rollout(env, num_simulations)
+                print("action", a)
             else:
                 mask = env.get_action_mask()
                 a = env._wait_for_human_click(mask)
@@ -139,28 +140,28 @@ def hvr(env, num_episodes, num_simulations):
 
 if __name__ == "__main__":
 
-    # env = QuartoEnv(render_mode="human")
-    # hvr(env, num_episodes=10, num_simulations=200)
+    env = QuartoEnv(render_mode="human")
+    hvr(env, num_episodes=10, num_simulations=5000)
 
 
 
-    env = LineWorldEnv(render_mode="rgb_array")
+    # env = LineWorldEnv(render_mode="rgb_array")
     # env = GridWorldEnv(render_mode="rgb_array")
     # env = TicTacToeEnv(render_mode="rgb_array")
     # env = QuartoEnv(render_mode="rgb_array")
 
-    video_env = RecordVideo(
-        env,
-        video_folder=f"{settings.videos_dir}/mcrr/{env.unwrapped}/eval/",
-        episode_trigger=lambda ep: ep % 1_000 == 0,
-    )
-    video_env.state_id = env.state_id
-    video_env.get_action_mask = env.get_action_mask
-    video_env.determinize = env.determinize
-    video_env.agent_player = env.agent_player
-    type(video_env).current_player = property(
-        lambda self: env.current_player,
-        lambda self, v: setattr(env, 'current_player', v)
-    )
-    run_mcrr(video_env, num_episodes=10_000, num_simulations=100)
-    video_env.close()
+    # video_env = RecordVideo(
+    #     env,
+    #     video_folder=f"{settings.videos_dir}/mcrr/{env.unwrapped}/eval/",
+    #     episode_trigger=lambda ep: ep % 1_000 == 0,
+    # )
+    # video_env.state_id = env.state_id
+    # video_env.get_action_mask = env.get_action_mask
+    # video_env.determinize = env.determinize
+    # video_env.agent_player = env.agent_player
+    # type(video_env).current_player = property(
+    #     lambda self: env.current_player,
+    #     lambda self, v: setattr(env, 'current_player', v)
+    # )
+    # run_mcrr(video_env, num_episodes=10_000, num_simulations=100)
+    # video_env.close()

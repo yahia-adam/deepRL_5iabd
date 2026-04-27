@@ -2,7 +2,6 @@ import time
 import math
 import numpy as np
 from gymnasium import Env
-
 from deeprl_5iabd.envs.line_world import LineWorldEnv
 from deeprl_5iabd.envs.grid_world import GridWorldEnv
 from deeprl_5iabd.envs.tictactoe import TicTacToeEnv
@@ -39,7 +38,6 @@ class MCTSNode:
         return len(self.untried_actions) == 0
 
     def _is_max_node(self):
-        # single-player → toujours en max
         if not getattr(self.env, "is_multi_player", False):
             return True
         return self.env.current_player == self.env.agent_player
@@ -58,7 +56,6 @@ class MCTSNode:
 
         return self.children[int(np.argmax(scores))]
 
-    # SELECTION
     def selection(self, c_param=1.4):
         node = self
         while (not node.is_terminal()
@@ -67,7 +64,6 @@ class MCTSNode:
             node = node.best_child(c_param)
         return node
 
-    # EXPANSION
     def expansion(self):
         action = int(self.untried_actions.pop())
 
@@ -80,7 +76,6 @@ class MCTSNode:
         self.children.append(child)
         return child
 
-    # SIMULATION
     def simulation(self):
         if self.terminal:
             return self.terminal_reward
@@ -100,7 +95,6 @@ class MCTSNode:
 
         return total
 
-    # BACKPROPAGATION
     def backpropagate(self, reward):
         self.visits += 1
         self.value += reward

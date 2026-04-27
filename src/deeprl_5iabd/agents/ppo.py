@@ -23,10 +23,6 @@ np.random.seed(seed)
 torch.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 
-
-# =========================================================
-# Networks
-# =========================================================
 class ActorAgent(nn.Module):
     def __init__(self, env):
         super().__init__()
@@ -61,10 +57,6 @@ class CriticAgent(nn.Module):
     def forward(self, state_tensor):
         return self.network(state_tensor).squeeze(-1)
 
-
-# =========================================================
-# Returns Monte Carlo
-# =========================================================
 def compute_returns(rewards, gamma):
     returns = []
     for t in range(len(rewards)):
@@ -76,10 +68,6 @@ def compute_returns(rewards, gamma):
         returns.append(G_t)
     return returns
 
-
-# =========================================================
-# Losses PPO
-# =========================================================
 def compute_ppo_loss(new_log_probs, old_log_probs, advantages, clip_eps):
     ratio = torch.exp(new_log_probs - old_log_probs)
     surr1 = ratio * advantages
@@ -91,18 +79,12 @@ def compute_critic_loss(values, returns):
     return ((values - returns) ** 2).mean()
 
 
-# =========================================================
-# Helper : un coup d'opposant random
-# =========================================================
 def opponent_step(env):
     mask = env.get_action_mask()
     action = env.action_space.sample(mask=mask)
     return env.step(action)
 
 
-# =========================================================
-# Training
-# =========================================================
 def ppo(
     env: gym.Env,
     num_episodes: int = 10_000,
@@ -126,7 +108,6 @@ def ppo(
 
     is_multi = getattr(env, "is_multi_player", False)
 
-    # buffers cumulés sur `rollout_size` épisodes
     buf_states, buf_actions, buf_masks = [], [], []
     buf_old_log_probs, buf_returns = [], []
     last_actor_loss = 0.0
@@ -145,18 +126,12 @@ def ppo(
         done = False
         truncated = False
 
-        # =====================================================
-        # Boucle externe : alterne opposant ↔ agent jusqu'à fin
-        # =====================================================
         while not (done or truncated):
-
-            # Tour(s) de l'opposant (skippé en mono-joueur)
             if is_multi:
                 while not (done or truncated) and env.current_player != env.agent_player:
                     state, final_reward, done, truncated, _ = opponent_step(env)
                     n_step += 1
 
-            # Tour(s) de l'agent
             while not (done or truncated) and (not is_multi or env.current_player == env.agent_player):
                 action_mask = env.get_action_mask()
                 state_tensor = torch.tensor(state).float()
@@ -174,9 +149,6 @@ def ppo(
                 state, final_reward, done, truncated, _ = env.step(action.item())
                 n_step += 1
 
-        # =========================================================
-        # Construction du vecteur rewards : 0 partout sauf le dernier
-        # =========================================================
         rewards_history[episode] = final_reward
         nbr_steps_history[episode] = n_step
 
@@ -192,9 +164,6 @@ def ppo(
             buf_old_log_probs.extend(old_log_probs_episode)
             buf_returns.extend(ep_returns)
 
-        # =========================================================
-        # PPO update tous les `rollout_size` épisodes
-        # =========================================================
         if episode % rollout_size == 0 and len(buf_states) > 0:
 
             returns_tensor = torch.tensor(buf_returns, dtype=torch.float32)
@@ -238,9 +207,6 @@ def ppo(
 
         loss_history[episode] = last_actor_loss
 
-        # =========================================================
-        # Logging + checkpoints
-        # =========================================================
         if episode % 100 == 0:
             recent_rewards = rewards_history[max(1, episode - 100):episode + 1]
             win_rate = np.mean(recent_rewards == 1) * 100
@@ -287,10 +253,6 @@ def ppo(
 
     return actor_agent
 
-
-# =========================================================
-# Évaluation
-# =========================================================
 def eval_agent(env, num_episodes=100, model_name="policy_ppo_clip=0.2_epochs=4_rollout=16_1000.pkl"):
     rewards_history = np.zeros(num_episodes)
 
