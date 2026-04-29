@@ -261,8 +261,34 @@ class QuartoEnv(gym.Env):
         return "QuartoEnv"
 
 
+def random_vs_random(env: QuartoEnv):
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        time.sleep(0.5)
+        mask = env.get_action_mask()        
+        _, reward, done, truncated, _ = env.step(env.action_space.sample(mask))
+        env.render()
+
+        done = done or truncated
+
+    print(reward)
+
+def human_vs_human(env: QuartoEnv):
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        mask = env.get_action_mask()        
+        _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
+        env.render()
+
+        done = done or truncated
+
+    print(reward)
+
 def human_vs_random(env: QuartoEnv):
-    
     env.reset()
     env.render()
     done = False
@@ -277,32 +303,3 @@ def human_vs_random(env: QuartoEnv):
         done = done or truncated
 
     print(reward)
-    env.render()
-    time.sleep(10)
-
-def human_vs_human(env: QuartoEnv):
-    env.reset()
-    env.render()
-    done = False
-    while not done:
-        mask = env.get_action_mask()        
-        if env.current_player == env.agent_player:
-            _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
-        else:
-            _, reward, done, truncated, _ = env.step(env._wait_for_human_click(mask))
-        env.render()
-
-        done = done or truncated
-
-    print(reward)
-    env.render()
-    time.sleep(10)
-
-if __name__ == "__main__":
-    env = QuartoEnv(render_mode="human")
-    
-    while True:
-        # human_vs_random(env)
-        human_vs_human(env)
-
-    env.close()

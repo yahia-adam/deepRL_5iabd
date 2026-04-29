@@ -261,7 +261,7 @@ def human_vs_human(env: TicTacToeEnv):
 
     print(reward)
     env.render()
-    time.sleep(10)
+    time.sleep(2)
 
 if __name__ == "__main__":
     env = TicTacToeEnv(render_mode="human")

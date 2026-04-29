@@ -57,21 +57,27 @@ def plot_metric(
 
     values = np.asarray(values, dtype=float)
     n = len(values)
-    w = max(1, min(window_size, n))
     valid = np.ones(n) if mask is None else np.asarray(mask, dtype=float)
 
-    def rolling_sum(a):
-        c = np.cumsum(a).astype(float)
-        out = c.copy()
-        out[w:] -= c[:-w]
-        return out
+    if window_size == 0:
+        curve = np.where(valid > 0, values, np.nan)
+        label = f"{metric_name} (raw)"
+    else:
+        w = max(1, min(window_size, n))
 
-    num = rolling_sum(values * valid)
-    den = rolling_sum(valid)
-    rolling = np.where(den > 0, num / np.maximum(den, 1), np.nan)
+        def rolling_sum(a):
+            c = np.cumsum(a).astype(float)
+            out = c.copy()
+            out[w:] -= c[:-w]
+            return out
+
+        num = rolling_sum(values * valid)
+        den = rolling_sum(valid)
+        curve = np.where(den > 0, num / np.maximum(den, 1), np.nan)
+        label = f"{metric_name} (window={w})"
 
     plt.figure(figsize=(10, 5))
-    plt.plot(rolling, label=f"{metric_name} (window={w})")
+    plt.plot(curve, label=label)
     plt.title(f"{exp_name} - {metric_name}")
     plt.xlabel("Episodes")
     plt.ylabel(metric_name)
@@ -84,7 +90,6 @@ def plot_metric(
     plt.savefig(path, dpi=300, bbox_inches="tight")
     plt.close()
     return path
-
 
 
 def plot_trace(trace, name="plot"):

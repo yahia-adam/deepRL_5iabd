@@ -1,21 +1,23 @@
-import time
 import os
+import json
+import time
 import numpy as np
+import gymnasium as gym
 from gymnasium import Env
-import matplotlib.pyplot as plt
-from collections import deque
+from gymnasium.wrappers import RecordVideo
 
+from deeprl_5iabd.helper import plot_metric
 from deeprl_5iabd.envs.line_world import LineWorldEnv
 from deeprl_5iabd.envs.grid_world import GridWorldEnv
 from deeprl_5iabd.envs.tictactoe import TicTacToeEnv
 from deeprl_5iabd.envs.quarto import QuartoEnv
 from deeprl_5iabd.config import settings
-from deeprl_5iabd.helper import plot_metric
-from gymnasium.wrappers import RecordVideo
+
+
+SEEDS = (42, 123, 7)
 
 
 def monte_carlo_random_rollout(env: Env, num_simulations: int):
-
     mask = env.get_action_mask()
     action_mean_rewards = np.full(len(mask), -np.inf)
 
@@ -23,8 +25,8 @@ def monte_carlo_random_rollout(env: Env, num_simulations: int):
     action_mean_rewards[valid_actions] = 0
 
     if len(valid_actions) == 0:
-        return
-    
+        return None
+
     a_resource = num_simulations // len(valid_actions)
 
     for test_action in valid_actions:
@@ -32,14 +34,12 @@ def monte_carlo_random_rollout(env: Env, num_simulations: int):
             new_env = env.determinize()
 
             total_reward = 0
-
             _, reward, terminated, truncated, _ = new_env.step(test_action)
             total_reward += reward
 
             while not (terminated or truncated):
-                mask = new_env.get_action_mask()
-                a = new_env.action_space.sample(mask=mask)
-
+                m = new_env.get_action_mask()
+                a = new_env.action_space.sample(mask=m)
                 _, reward, terminated, truncated, _ = new_env.step(a)
                 total_reward += reward
 
@@ -47,121 +47,142 @@ def monte_carlo_random_rollout(env: Env, num_simulations: int):
 
         action_mean_rewards[test_action] /= a_resource
 
-    best_action_idx = np.argmax(action_mean_rewards)
-    return int(best_action_idx)
+    return int(np.argmax(action_mean_rewards))
 
 
-def run_mcrr(env: Env, num_episodes: int = 1_000, num_simulations: int = 50):
-    print(f"starting mcrr for {env.unwrapped} num_episodes={num_episodes} num_simulations={num_simulations}")
+def eval_agent(
+    env: Env,
+    num_episodes: int = 1_000,
+    num_simulations: int = 100,
+    seed: int = 42,
+):
+    np.random.seed(seed)
 
-    rewards_history = np.zeros(num_episodes + 1)
-    nbr_steps_history = np.zeros(num_episodes + 1)
-    game_times_history = np.zeros(num_episodes + 1)
-
+    agent_name = f"mcrr_sim{num_simulations}"
     is_multi = getattr(env, "is_multi_player", False)
 
-    for episode in range(1, num_episodes+1):
+    rewards_history = np.zeros(num_episodes)
+    n_steps_history = np.zeros(num_episodes, dtype=int)
+    time_per_move_history = np.zeros(num_episodes)
+
+    print(f"[{agent_name} | {env.unwrapped} | seed={seed}] Starting eval "
+          f"num_episodes={num_episodes} num_simulations={num_simulations}")
+
+    for i in range(num_episodes):
         env.reset()
-        terminated = False
+        done = False
         truncated = False
         reward = 0.0
         n_step = 0
+        episode_time = 0.0
 
-        t0 = time.perf_counter()
-        while not (terminated or truncated):
+        while not (done or truncated):
             if is_multi and env.current_player != env.agent_player:
                 mask = env.get_action_mask()
-                a = env.action_space.sample(mask=mask)
+                action = env.action_space.sample(mask=mask)
+                _, reward, done, truncated, _ = env.step(action)
+                n_step += 1
             else:
-                a = monte_carlo_random_rollout(env, num_simulations)
+                t0 = time.perf_counter()
+                action = monte_carlo_random_rollout(env, num_simulations)
+                episode_time += time.perf_counter() - t0
 
-            _, reward, terminated, truncated, _ = env.step(a)
-            n_step += 1
+                _, reward, done, truncated, _ = env.step(action)
+                n_step += 1
 
-        game_time = time.perf_counter() - t0
-        rewards_history[episode - 1] = reward
-        nbr_steps_history[episode - 1] = n_step
-        game_times_history[episode - 1] = game_time
+        rewards_history[i] = reward
+        n_steps_history[i] = n_step
+        time_per_move_history[i] = episode_time / max(n_step, 1)
 
-        if episode % 100 == 0:
-            print(f"episode {episode} reward={reward} n_step={n_step} game_time={game_time}s")
+        if (i + 1) % 100 == 0:
+            recent_rewards = rewards_history[max(0, i - 99):i + 1]
+            win_rate = np.mean(recent_rewards == 1) * 100
+            loss_rate = np.mean(recent_rewards == -1) * 100
+            print(
+                f"[{agent_name} | {env.unwrapped} | seed={seed}] Episode {i + 1} | "
+                f"Win={win_rate:.0f}% Lose={loss_rate:.0f}% | "
+                f"Time/move={time_per_move_history[i] * 1000:.2f}ms"
+            )
 
-    save_dir = f"{settings.evaluation_logs_dir}/mcrr/{env.unwrapped}"
-    exp_name = f"mcrr_sim{num_simulations}_env_{env.unwrapped}"
+    plot_dir = f"{settings.training_logs_dir}/mcrr/{env.unwrapped}/seed_{seed}/eval"
+    os.makedirs(plot_dir, exist_ok=True)
 
-    winrate_path = plot_metric(
-        values=rewards_history,
-        save_dir=save_dir,
-        window_size=100,
-        exp_name=exp_name,
-        metric_name="winrate",
+    plot_metric(values=rewards_history, save_dir=plot_dir, window_size=0,
+                exp_name=f"{agent_name}_env_{env.unwrapped}", metric_name="winrate")
+    plot_metric(values=n_steps_history, save_dir=plot_dir, window_size=0,
+                exp_name=f"{agent_name}_env_{env.unwrapped}", metric_name="nbr_steps")
+    plot_metric(values=time_per_move_history, save_dir=plot_dir, window_size=0,
+                exp_name=f"{agent_name}_env_{env.unwrapped}", metric_name="time_per_move")
+
+    results = {
+        "env": str(env.unwrapped),
+        "agent": agent_name,
+        "seed": seed,
+        "num_episodes": num_episodes,
+        "num_simulations": num_simulations,
+        "summary": {
+            "mean_reward": float(np.mean(rewards_history)),
+            "win_rate": float(np.mean(rewards_history == 1)),
+            "loss_rate": float(np.mean(rewards_history == -1)),
+            "draw_rate": float(np.mean(rewards_history == 0)),
+            "mean_steps": float(np.mean(n_steps_history)),
+            "std_steps": float(np.std(n_steps_history)),
+            "mean_time_per_move_ms": float(np.mean(time_per_move_history) * 1000),
+        },
+        "episodes": [
+            {
+                "episode": int(i),
+                "reward": float(rewards_history[i]),
+                "n_steps": int(n_steps_history[i]),
+                "time_per_move_ms": float(time_per_move_history[i] * 1000),
+            }
+            for i in range(num_episodes)
+        ],
+    }
+
+    json_path = f"{plot_dir}/{agent_name}.json"
+    with open(json_path, "w") as f:
+        json.dump(results, f, indent=2)
+
+    s = results["summary"]
+    print(
+        f"[EVAL {env.unwrapped}/{agent_name} | seed={seed}] "
+        f"win={s['win_rate']:.2%} loss={s['loss_rate']:.2%} draw={s['draw_rate']:.2%} "
+        f"mean_steps={s['mean_steps']:.2f} -> {json_path}"
     )
-    nbr_steps_path = plot_metric(
-        values=nbr_steps_history,
-        save_dir=save_dir,
-        window_size=100,
-        exp_name=exp_name,
-        metric_name="nbr_steps",
+    return results
+
+
+def eval_all_for_env(env, seed, num_simulations=100):
+    eval_agent(env, num_episodes=1_000, num_simulations=num_simulations, seed=seed)
+
+
+def wrap_video(env, seed, episode_num_trigger):
+    video_env = RecordVideo(
+        env,
+        video_folder=f"{settings.videos_dir}/mcrr/{env.unwrapped}/seed_{seed}/eval/",
+        episode_trigger=lambda ep: ep % episode_num_trigger == 0,
     )
-    game_time_path = plot_metric(
-        values=game_times_history,
-        save_dir=save_dir,
-        window_size=100,
-        exp_name=exp_name,
-        metric_name="game_time",
+    video_env.state_id = env.state_id
+    video_env.get_action_mask = env.get_action_mask
+    video_env.determinize = env.determinize
+    video_env.agent_player = env.agent_player
+    if hasattr(env, "is_multi_player"):
+        video_env.is_multi_player = env.is_multi_player
+    type(video_env).current_player = property(
+        lambda self: env.current_player,
+        lambda self, v: setattr(env, "current_player", v)
     )
+    return video_env
 
-    print(f"winrate_path={winrate_path}")
-    print(f"nbr_steps_path={nbr_steps_path}")
-    print(f"game_time_path={game_time_path}")
-
-def hvr(env, num_episodes, num_simulations):
-
-
-    for e in range(num_episodes):
-        env.reset()
-        done = False
-        while not done:
-            env.render()
-            if env.current_player == env.agent_player:
-                a = monte_carlo_random_rollout(env, num_simulations)
-                print("action", a)
-            else:
-                mask = env.get_action_mask()
-                a = env._wait_for_human_click(mask)
-
-            _, reward, terminated, truncated, _ = env.step(a)
-            done = terminated or truncated
-        print(reward)
-        env.render()
-        time.sleep(5)
-
-    env.close()
 
 if __name__ == "__main__":
+    env_classes = [LineWorldEnv, GridWorldEnv, TicTacToeEnv, QuartoEnv]
 
-    env = QuartoEnv(render_mode="human")
-    hvr(env, num_episodes=10, num_simulations=5000)
-
-
-
-    # env = LineWorldEnv(render_mode="rgb_array")
-    # env = GridWorldEnv(render_mode="rgb_array")
-    # env = TicTacToeEnv(render_mode="rgb_array")
-    # env = QuartoEnv(render_mode="rgb_array")
-
-    # video_env = RecordVideo(
-    #     env,
-    #     video_folder=f"{settings.videos_dir}/mcrr/{env.unwrapped}/eval/",
-    #     episode_trigger=lambda ep: ep % 1_000 == 0,
-    # )
-    # video_env.state_id = env.state_id
-    # video_env.get_action_mask = env.get_action_mask
-    # video_env.determinize = env.determinize
-    # video_env.agent_player = env.agent_player
-    # type(video_env).current_player = property(
-    #     lambda self: env.current_player,
-    #     lambda self, v: setattr(env, 'current_player', v)
-    # )
-    # run_mcrr(video_env, num_episodes=10_000, num_simulations=100)
-    # video_env.close()
+    for seed in SEEDS:
+        for EnvCls in env_classes:
+            env_eval = EnvCls(render_mode="rgb_array")
+            video_env_eval = wrap_video(env_eval, seed, episode_num_trigger=100)
+            print(f"\n{'=' * 60}\nEVAL {env_eval.unwrapped} | seed={seed}\n{'=' * 60}")
+            eval_all_for_env(video_env_eval, seed, num_simulations=100)
+            video_env_eval.close()

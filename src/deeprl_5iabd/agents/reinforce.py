@@ -11,7 +11,7 @@ from torch import optim
 from torch.distributions import Categorical
 from gymnasium.wrappers import RecordVideo
 
-from deeprl_5iabd.helper import softmax_with_mask, plot_metric, plot_trace
+from deeprl_5iabd.helper import softmax_with_mask, plot_metric
 from deeprl_5iabd.envs.line_world import LineWorldEnv
 from deeprl_5iabd.envs.grid_world import GridWorldEnv
 from deeprl_5iabd.envs.tictactoe import TicTacToeEnv
@@ -19,7 +19,7 @@ from deeprl_5iabd.envs.quarto import QuartoEnv
 from deeprl_5iabd.config import settings
 
 
-SEEDS = (42, 123, 7)
+SEEDS = (42,)
 
 
 def set_seed(seed: int):
@@ -219,7 +219,8 @@ def reinforce(
                 pickle.dump(reinforce_agent.state_dict(), f)
             print(f"Model saved: {model_dir}/policy_{agent_name}_{episode}.pkl")
 
-    plot_dir = f"{settings.training_logs_dir}/reinforce/{env.unwrapped}/seed_{seed}"
+    plot_dir = f"{settings.training_logs_dir}/reinforce/{env.unwrapped}/seed_{seed}/train"
+    os.makedirs(plot_dir, exist_ok=True)
 
     plot_metric(values=rewards_history, save_dir=plot_dir, window_size=100,
                 exp_name=f"{agent_name}_env_{env.unwrapped}", metric_name="winrate")
@@ -230,13 +231,48 @@ def reinforce(
     plot_metric(values=time_per_move_history, save_dir=plot_dir, window_size=100,
                 exp_name=f"time_per_move_{agent_name}_env_{env.unwrapped}", metric_name="time_per_move")
 
+    train_results = {
+        "env": str(env.unwrapped),
+        "agent": agent_name,
+        "seed": seed,
+        "num_episodes": num_episodes,
+        "hyperparameters": {
+            "lr": lr,
+            "gamma": gamma,
+            "use_mean_baseline": use_mean_baseline,
+            "use_critic_baseline": use_critic_baseline,
+        },
+        "summary": {
+            "mean_reward": float(np.mean(rewards_history[1:])),
+            "win_rate": float(np.mean(rewards_history[1:] == 1)),
+            "loss_rate": float(np.mean(rewards_history[1:] == -1)),
+            "draw_rate": float(np.mean(rewards_history[1:] == 0)),
+            "mean_policy_loss": float(np.mean(loss_history[1:])),
+            "mean_steps": float(np.mean(nbr_steps_history[1:])),
+            "std_steps": float(np.std(nbr_steps_history[1:])),
+            "mean_time_per_move_ms": float(np.mean(time_per_move_history[1:]) * 1000),
+        },
+        "episodes": [
+            {
+                "episode": int(ep),
+                "reward": float(rewards_history[ep]),
+                "policy_loss": float(loss_history[ep]),
+                "n_steps": int(nbr_steps_history[ep]),
+                "time_per_move_ms": float(time_per_move_history[ep] * 1000),
+            }
+            for ep in range(1, num_episodes + 1)
+        ],
+    }
+
+    json_path = f"{plot_dir}/{agent_name}_{num_episodes}.json"
+    with open(json_path, "w") as f:
+        json.dump(train_results, f, indent=2)
+    print(f"Training metrics saved: {json_path}")
+
     return reinforce_agent
 
 
 def eval_agent(env, num_episodes=1_000, model_name="policy_reinforce_no_baseline_1000.pkl", seed: int = 42):
-    rewards_history = np.zeros(num_episodes)
-    n_steps_history = np.zeros(num_episodes, dtype=int)
-
     agent = ActorAgent(env)
     with open(f"{settings.models_path}/reinforce/{env.unwrapped}/seed_{seed}/{model_name}", "rb") as f:
         state_dict = pickle.load(f)
@@ -245,8 +281,14 @@ def eval_agent(env, num_episodes=1_000, model_name="policy_reinforce_no_baseline
 
     is_multi = getattr(env, "is_multi_player", False)
 
+    rewards_history = np.zeros(num_episodes)
+    n_steps_history = np.zeros(num_episodes, dtype=int)
+    time_per_move_history = np.zeros(num_episodes)
+
     for i in range(num_episodes):
         n_step = 0
+        episode_start = time.perf_counter()
+
         with torch.no_grad():
             state, _ = env.reset()
             done = False
@@ -271,15 +313,24 @@ def eval_agent(env, num_episodes=1_000, model_name="policy_reinforce_no_baseline
                     state, reward, done, truncated, _ = env.step(action)
                     n_step += 1
 
+        episode_time = time.perf_counter() - episode_start
         rewards_history[i] = reward
         n_steps_history[i] = n_step
+        time_per_move_history[i] = episode_time / max(n_step, 1)
 
-    plot_trace(rewards_history, model_name)
-
-    # parse: policy_<agent_name>_<checkpoint>.pkl
     base = model_name.replace("policy_", "").replace(".pkl", "")
     agent_name, checkpoint_str = base.rsplit("_", 1)
     checkpoint = int(checkpoint_str)
+
+    plot_dir = f"{settings.training_logs_dir}/reinforce/{env.unwrapped}/seed_{seed}/eval"
+    os.makedirs(plot_dir, exist_ok=True)
+
+    plot_metric(values=rewards_history, save_dir=plot_dir, window_size=0,
+                exp_name=f"{agent_name}_{checkpoint}_env_{env.unwrapped}", metric_name="winrate")
+    plot_metric(values=n_steps_history, save_dir=plot_dir, window_size=0,
+                exp_name=f"{agent_name}_{checkpoint}_env_{env.unwrapped}", metric_name="nbr_steps")
+    plot_metric(values=time_per_move_history, save_dir=plot_dir, window_size=0,
+                exp_name=f"{agent_name}_{checkpoint}_env_{env.unwrapped}", metric_name="time_per_move")
 
     results = {
         "env": str(env.unwrapped),
@@ -294,16 +345,20 @@ def eval_agent(env, num_episodes=1_000, model_name="policy_reinforce_no_baseline
             "draw_rate": float(np.mean(rewards_history == 0)),
             "mean_steps": float(np.mean(n_steps_history)),
             "std_steps": float(np.std(n_steps_history)),
+            "mean_time_per_move_ms": float(np.mean(time_per_move_history) * 1000),
         },
         "episodes": [
-            {"episode": int(i), "reward": float(r), "n_steps": int(s)}
-            for i, (r, s) in enumerate(zip(rewards_history, n_steps_history))
+            {
+                "episode": int(i),
+                "reward": float(rewards_history[i]),
+                "n_steps": int(n_steps_history[i]),
+                "time_per_move_ms": float(time_per_move_history[i] * 1000),
+            }
+            for i in range(num_episodes)
         ],
     }
 
-    json_dir = f"{settings.training_logs_dir}/reinforce/{env.unwrapped}/seed_{seed}/eval"
-    os.makedirs(json_dir, exist_ok=True)
-    json_path = f"{json_dir}/{agent_name}_{checkpoint}.json"
+    json_path = f"{plot_dir}/{agent_name}_{checkpoint}.json"
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
 
@@ -353,14 +408,14 @@ if __name__ == "__main__":
 
     for seed in SEEDS:
         for EnvCls in env_classes:
-            # ---- TRAIN ----
+            #  TRAIN 
             env_train = EnvCls(render_mode="rgb_array")
             video_env_train = wrap_video(env_train, "train", seed, 10_000)
             print(f"\n{'=' * 60}\nTRAIN {env_train.unwrapped} | seed={seed}\n{'=' * 60}")
             train_all_baseline_for_env(video_env_train, seed)
             video_env_train.close()
 
-            # ---- EVAL ----
+            #  EVAL 
             env_eval = EnvCls(render_mode="rgb_array")
             video_env_eval = wrap_video(env_eval, "eval", seed, 100)
             print(f"\n{'=' * 60}\nEVAL {env_eval.unwrapped} | seed={seed}\n{'=' * 60}")
